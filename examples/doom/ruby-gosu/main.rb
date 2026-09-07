@@ -209,12 +209,12 @@ class DoomWindow < Gosu::Window
     @ticks += 1
     @rate_ticks += 1
     return unless (@ticks % CAPTION_UPDATE_EVERY).zero?
-
+    
     now = Process.clock_gettime(Process::CLOCK_MONOTONIC)
     @rate = @rate_ticks / (now - @rate_window_start)
     @rate_ticks = 0
     @rate_window_start = now
-    self.caption = format("DOOM (dewasm) - %.1f ticks/sec", @rate)
+    self.caption = format("DOOM (dewasm) - %.1f tps #{RUBY_DESCRIPTION} ", @rate)
   end
 
   def draw
