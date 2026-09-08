@@ -1,7 +1,7 @@
 # Decision 91: Extend the Guest When the Interface, Not the Frontend, Is What Is Missing
 
 Status: **Accepted, 2026-09-08.**
-`examples/doom` pins upstream doom.wasm v0.1.0 plus [one commit](https://github.com/sisshiki1969/doom.wasm/tree/sound) adding thirteen `audio` imports, and `ruby-gosu/audio.rb` plays them through gosu; the other six frontends answer those imports silently.
+`examples/doom` pins upstream doom.wasm v0.1.0 plus [one commit](https://github.com/sisshiki1969/doom.wasm/tree/sound) adding thirteen `audio` imports, and `ruby-gosu/audio.rb` plays them; the other six frontends answer those imports silently.
 This revises [decision 50](50-doom-example-shape.md)'s criterion, which forbade rebuilding the guest at all.
 
 ## Context
@@ -58,5 +58,7 @@ Sample data crosses once per sound rather than once per play (`registerSound` th
 - Negative: the pin is a fork branch rather than a release, because upstream has nothing to release yet, and `raw.githubusercontent.com` rather than a release asset because the session that built it could not create one.
   Both move as soon as upstream takes the change.
   A wasm import cannot be omitted, so six frontends carry thirteen imports they answer with nothing; that is spelled silence, not dead code, and it is what a machine with no sound device looked like.
+- Carry-over: gosu decodes audio with SDL_sound, whose decoder set has no MIDI in it, so the frontend that motivated the interface plays the effects through gosu and the music through SDL2_mixer, the library Doom's own SDL backend plays these same files with.
+  That is the frontend's business, not the interface's: what crosses the seam is still a MIDI file.
 - Carry-over: enabling `FEATURE_SOUND` for the first time surfaced three latent faults in doomgeneric, all invisible while it was never defined: `DG_sound_module` declared as a pointer but defined and used as a value; `FEATURE_SOUND` doing double duty as "SDL's headers are available", pulling `<SDL_endian.h>` into endianness handling that has nothing to do with sound; and `I_PrecacheSounds` running as `S_Init`'s first statement, before the loop that sets each `lumpnum` to -1, so every sound resolves to lump 0 (`PLAYPAL`).
   A dormant extension point is not a tested one.

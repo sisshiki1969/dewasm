@@ -3,6 +3,8 @@
 require "fileutils"
 require "tmpdir"
 
+require_relative "midi_song"
+
 # Implements the wasm module's thirteen `audio` imports on gosu.
 #
 # Doom hands over sample data once per sound (`registerSound`) and then names
@@ -138,7 +140,7 @@ class DoomAudio
     handle = (@next_song_handle += 1)
     path = File.join(@dir, "song#{handle}.mid")
     File.binwrite(path, @memory.get_string(ptr, length))
-    @songs[handle] = Gosu::Song.new(path)
+    @songs[handle] = load_song(path)
     handle
   rescue StandardError => e
     warn_music_unavailable(e)
@@ -146,15 +148,22 @@ class DoomAudio
     0
   end
 
+  # A released gosu cannot decode MIDI at all, so `MidiSong` plays it through
+  # SDL2_mixer instead; gosu is tried first because a gosu whose audio is
+  # SDL2_mixer already (monoruby ships one) then needs no second device.
+  def load_song(path)
+    Gosu::Song.new(path)
+  rescue StandardError
+    MidiSong.new(path)
+  end
+
   # Doom re-registers on every level change, so the same cause would be
   # reported over and over; say it once.
   #
-  # Music is MIDI, so it needs a synthesiser behind SDL2_mixer (fluidsynth with
-  # a soundfont, or timidity with a patch set) that the effects, being PCM, do
-  # not: an SDL2_mixer built without one plays every effect and no music, which
-  # is worth naming because the loader only reports the format as unsupported.
-  # A device that will not open at all is the other case, and MIDI is not its
-  # cause.
+  # Music needs a synthesiser (fluidsynth with a soundfont, or timidity with a
+  # patch set) that the effects, being PCM, do not, so where one is missing
+  # every effect plays and no music does. That is worth naming, because what
+  # the loaders report is an unsupported format.
   def warn_music_unavailable(err)
     return if @music_warned
 
@@ -162,16 +171,18 @@ class DoomAudio
     warn "audio: music unavailable (#{err.class}: #{err.message})"
     return if err.message.include?("Mix_OpenAudio")
 
-    warn "audio: SDL2_mixer needs a MIDI synthesiser: point SDL_SOUNDFONTS at a .sf2 file, " \
-         "or install timidity. Sound effects need none and are unaffected."
+    warn "audio: music is MIDI, so it needs SDL2_mixer built with a synthesiser " \
+         "(macOS: brew install sdl2_mixer) and SDL_SOUNDFONTS pointing at a .sf2 file. " \
+         "Sound effects need neither and are unaffected."
   end
 
   def unregister_song(handle)
     song = @songs.delete(handle)
     return if song.nil?
 
-    song.stop if @playing.equal?(song)
     @playing = nil if @playing.equal?(song)
+    # `Gosu::Song` frees itself when collected and has no `close`.
+    song.respond_to?(:close) ? song.close : song.stop
   end
 
   def play_song(handle, looping)

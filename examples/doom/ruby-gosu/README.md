@@ -6,6 +6,7 @@ The sibling [`../ruby`](../ruby) frontend draws the same game into a terminal; t
 `build.sh` fetches jacobenget/doom.wasm (checksum-pinned into the shared apps cache) and converts it to Ruby with dewasm (`doom_gen.rb`, ~10MB, gitignored, regenerated on every build).
 `main.rb` implements the module's host imports (console logging, save-game I/O, the game clock, and frame delivery) plus the gosu window, its renderer and its keyboard input.
 `audio.rb` implements the thirteen audio imports: it wraps each DMX sound lump the module hands over in a WAV container for `Gosu::Sample`, and writes the MIDI the module converts from Doom's MUS encoding to a file for `Gosu::Song`.
+`midi_song.rb` plays that file through SDL2_mixer instead where gosu will not take it, which is described under [Sound](#sound).
 
 ## Requirements
 
@@ -16,6 +17,19 @@ gem install gosu          # Debian/Ubuntu: sudo apt install libsdl2-dev
 ```
 
 `build.sh` checks for it and prints the per-platform header package if it is missing.
+
+Sound effects need nothing further.
+Music needs a MIDI synthesiser, for the reason [below](#sound):
+
+```sh
+gem install ffi
+brew install sdl2_mixer                    # Debian/Ubuntu: sudo apt install libsdl2-mixer-2.0-0 fluid-soundfont-gm
+export SDL_SOUNDFONTS=/path/to/some.sf2    # any General MIDI soundfont, macOS only
+```
+
+SDL2_mixer synthesises MIDI with fluidsynth, which needs a soundfont.
+On Linux it reads `/usr/share/sounds/sf2/default-GM.sf2` without being told, which is what the soundfont package above provides; on macOS there is no such default, so `SDL_SOUNDFONTS` has to name one.
+Without any of this the game runs with its effects and no music, and says so once.
 
 ## Why a window is affordable here
 
@@ -97,4 +111,14 @@ gosu closes a window on Escape unless the frontend overrides its `button_down`, 
 
 Save games are written to `.savegame/` (gitignored) relative to wherever the script runs.
 
-No sound: the module exposes no audio interface.
+## Sound
+
+The module hands over each sound as a DMX lump (an 8-byte header and unsigned 8-bit mono samples) and each song as standard MIDI, having converted it from Doom's own MUS encoding.
+`audio.rb` wraps a lump in a 44-byte WAV header, which costs one string concatenation per distinct sound, and writes both to files because gosu loads audio from paths rather than from memory.
+
+Music does not go to `Gosu::Song`, though it is offered there first.
+gosu decodes audio with SDL_sound, whose decoders are WAV, AIFF, VOC, AU, FLAC, MP3, Ogg Vorbis, Shorten and tracker modules: MIDI is not among them, so a released gosu answers `Could not parse audio file ...: Sound format unsupported` for every song, whatever the machine has installed.
+`midi_song.rb` therefore binds the eleven SDL2_mixer entry points that music needs and presents them as `Gosu::Song`'s interface, so the rest of `audio.rb` does not know which one it holds.
+SDL2_mixer is what Doom's own SDL backend plays these same files with, and it synthesises MIDI through fluidsynth or timidity.
+
+Offering gosu the file first is not a formality: monoruby ships a gosu whose audio *is* SDL2_mixer, and there `Gosu::Song` takes the MIDI and no second output device is opened.
