@@ -1,0 +1,632 @@
+From bdb9a4cbd85418516d4c78107acc92a3489037fc Mon Sep 17 00:00:00 2001
+From: sisshiki1969 <sisshiki@isshiki-clinic.com>
+Date: Tue, 8 Sep 2026 04:02:04 +0000
+Subject: [PATCH] Add an audio interface to the WebAssembly module
+
+doom.wasm produces no sound: its ten imports carry the framebuffer, the
+clock, WAD loading, save games and logging, and nothing tells a host that a
+sound should be heard. The README lists audio as a wishlist item.
+
+Doom itself needs no change for this. `i_sound.c` already looks for a
+`DG_sound_module` / `DG_music_module` pair behind FEATURE_SOUND, and
+`i_sound.c` / `s_sound.c` / `sounds.c` are already compiled in; only the
+bottom layer, the one that would touch an audio device, was missing. This
+adds it as thirteen `audio` imports and the two module structs that
+forward to them.
+
+Sample data crosses the boundary once per sound rather than once per play:
+`registerSound` hands over a sound's DMX lump the first time it is heard,
+and every later `startSound` names it by id alone, so a host never has to
+know how a WAD is laid out. Music crosses as standard MIDI, the module
+converting Doom's own MUS encoding with the mus2mid that already ships
+here, so a host needs a MIDI player rather than a MUS parser. That is also
+what the SDL music module does before handing a lump to SDL_mixer.
+
+Three things had to be fixed for FEATURE_SOUND to work at all, none of
+which anything exercised while it was never defined:
+
+  * `i_sound.c` declared `extern sound_module_t *DG_sound_module` but used
+    `&DG_sound_module` and the SDL module defines it unstarred, so the
+    types did not agree.
+
+  * FEATURE_SOUND was doing double duty as "SDL's headers are available":
+    it pulled <SDL_mixer.h> into i_sound.c, <SDL_endian.h> into i_swap.h,
+    which is endianness handling and not a sound feature at all, and bound
+    two config variables that only the SDL sound module defines. A port
+    with a sound module but no SDL now says DG_WITHOUT_SDL and gets the
+    plain little-endian definitions.
+
+  * `I_PrecacheSounds` runs as the first statement of `S_Init`, before the
+    loop that sets each `lumpnum` to -1, so at that point every one is
+    still zero -- a real lump (PLAYPAL), not an obviously invalid one. The
+    SDL module sidesteps this by resolving every name itself; this module
+    registers lazily from `StartSound` instead and leaves precaching empty.
+
+mus2mid moves from example_implementation to the shared src/include trees.
+It is a pure data transformation with no SDL dependency, and both the
+example and this module now use it; its one example-only include moves
+under the STANDALONE guard it belongs to.
+
+Verified by building the module and driving it for 60 ticks plus twenty
+fire presses: 26 sounds register with valid DMX headers, `startSound` is
+called 111 times, and two songs arrive as MIDI ("MThd"). Building the same
+tree with this commit reverted reproduces the released v0.1.0 binary
+exactly (sha256 8edfe49a7583fd975199969302d8e9adcf8e714d0af72bf3e672f991fd810faa).
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01CreYezJ9tefe5BjESSzd7Q
+---
+ Makefile                                      |  10 +-
+ doomgeneric/example_implementation/Makefile   |   4 +-
+ doomgeneric/include/i_swap.h                  |   8 +-
+ .../mus2mid.h                                 |   0
+ doomgeneric/src/i_sound.c                     |   8 +-
+ doomgeneric/src/m_config.c                    |   2 +-
+ .../{example_implementation => src}/mus2mid.c |   3 +-
+ src/doom_wasm.c                               | 239 +++++++++++++++++-
+ src/doom_wasm.h                               | 127 ++++++++++
+ 9 files changed, 385 insertions(+), 16 deletions(-)
+ rename doomgeneric/{example_implementation => include}/mus2mid.h (100%)
+ rename doomgeneric/{example_implementation => src}/mus2mid.c (99%)
+
+diff --git a/Makefile b/Makefile
+index dadaf61..e79b9f5 100644
+--- a/Makefile
++++ b/Makefile
+@@ -146,7 +146,11 @@ $(BINARYEN_UTILS): ${BINARYEN_DIR}/bin/%: ${BINARYEN_DIR}
+ # Targets for producing the main artifact of this repo: a Doom WebAssembly module 
+ ####################################################################################
+ 
+-CFLAGS += --target=wasm32-unknown-wasi -Wall -g -Os
++# FEATURE_SOUND selects the DG_sound_module / DG_music_module hooks in
++# i_sound.c, which src/doom_wasm.c fills with modules that forward to the
++# 'audio' imports. DG_WITHOUT_SDL says that this port has no SDL headers,
++# which is otherwise conflated with FEATURE_SOUND.
++CFLAGS += --target=wasm32-unknown-wasi -Wall -g -Os -DFEATURE_SOUND -DDG_WITHOUT_SDL
+ # Details on a few of the linker flags used:
+ #
+ #   -Wl,  <-- needed to pass the immediately following option directly to the linker,
+@@ -169,7 +173,7 @@ OUTPUT_UTIL_WASM_MODULES = $(OUTPUT_DIR)/util-wasm-modules
+ FILE_EMBEDDED_IN_CODE_DIR = $(OUTPUT_DIR)/file_embedded_in_code
+ FILE_EMBEDDED_IN_CODE_OUTPUT_DIR = $(FILE_EMBEDDED_IN_CODE_DIR)/$(OUTPUT_DIR)
+ 
+-SRC_DOOM = dummy.c am_map.c doomdef.c doomstat.c dstrings.c d_event.c d_items.c d_iwad.c d_loop.c d_main.c d_mode.c d_net.c f_finale.c f_wipe.c g_game.c hu_lib.c hu_stuff.c info.c i_cdmus.c i_endoom.c i_joystick.c i_scale.c i_sound.c i_system.c i_timer.c memio.c m_argv.c m_bbox.c m_cheat.c m_config.c m_controls.c m_fixed.c m_menu.c m_misc.c m_random.c p_ceilng.c p_doors.c p_enemy.c p_floor.c p_inter.c p_lights.c p_map.c p_maputl.c p_mobj.c p_plats.c p_pspr.c p_saveg.c p_setup.c p_sight.c p_spec.c p_switch.c p_telept.c p_tick.c p_user.c r_bsp.c r_data.c r_draw.c r_main.c r_plane.c r_segs.c r_sky.c r_things.c sha1.c sounds.c statdump.c st_lib.c st_stuff.c s_sound.c tables.c v_video.c wi_stuff.c w_checksum.c w_file.c w_wad.c z_zone.c i_input.c i_video.c doomgeneric.c
++SRC_DOOM = dummy.c am_map.c doomdef.c doomstat.c dstrings.c d_event.c d_items.c d_iwad.c d_loop.c d_main.c d_mode.c d_net.c f_finale.c f_wipe.c g_game.c hu_lib.c hu_stuff.c info.c i_cdmus.c i_endoom.c i_joystick.c i_scale.c i_sound.c i_system.c i_timer.c memio.c mus2mid.c m_argv.c m_bbox.c m_cheat.c m_config.c m_controls.c m_fixed.c m_menu.c m_misc.c m_random.c p_ceilng.c p_doors.c p_enemy.c p_floor.c p_inter.c p_lights.c p_map.c p_maputl.c p_mobj.c p_plats.c p_pspr.c p_saveg.c p_setup.c p_sight.c p_spec.c p_switch.c p_telept.c p_tick.c p_user.c r_bsp.c r_data.c r_draw.c r_main.c r_plane.c r_segs.c r_sky.c r_things.c sha1.c sounds.c statdump.c st_lib.c st_stuff.c s_sound.c tables.c v_video.c wi_stuff.c w_checksum.c w_file.c w_wad.c z_zone.c i_input.c i_video.c doomgeneric.c
+ SRC_DOOM_WASM_SPECIFIC = doom_wasm.c internal__wasi-snapshot-preview1.c
+ EMBEDDED_BINARY_FILES = DOOM1.WAD
+ SRC_FOR_EMBEDDED_FILES = $(addprefix $(FILE_EMBEDDED_IN_CODE_DIR)/, $(addsuffix .c, $(EMBEDDED_BINARY_FILES)))
+@@ -240,7 +244,7 @@ $(OUTPUT_DIR)/%.o:	doomgeneric/src/%.c
+ $(OUTPUT_DIR_WASM_SPECIFIC)/%.o:	src/%.c $(HEADERS_FOR_EMBEDDED_FILES)
+ 	$(VB)if echo "$(CC)" | grep -q "wasi"; then \
+ 		echo [Compiling $<]; \
+-		$(CC) $(CFLAGS) -I$(DIR_CONTAINING_THIS_MAKEFILE)/doomgeneric -I$(OUTPUT_DIR) -c $< -o $@; \
++		$(CC) $(CFLAGS) -I$(DIR_CONTAINING_THIS_MAKEFILE)/doomgeneric -I$(DIR_CONTAINING_THIS_MAKEFILE)/doomgeneric/include -I$(OUTPUT_DIR) -c $< -o $@; \
+ 	else \
+ 		echo [Delegating to WASI SDK Docker image]; \
+ 		${RUN_IN_WASI_SDK_DOCKER_IMAGE} make $(MAKEFLAGS) $@; \
+diff --git a/doomgeneric/example_implementation/Makefile b/doomgeneric/example_implementation/Makefile
+index 3017764..23b1525 100644
+--- a/doomgeneric/example_implementation/Makefile
++++ b/doomgeneric/example_implementation/Makefile
+@@ -18,8 +18,8 @@ OUTPUT_EXE_NAME = doom
+ OUTPUT = $(OUTPUT_DIR)/${OUTPUT_EXE_NAME}
+ 
+ 
+-SRC_DOOM = dummy.c am_map.c doomdef.c doomstat.c dstrings.c d_event.c d_items.c d_iwad.c d_loop.c d_main.c d_mode.c d_net.c f_finale.c f_wipe.c g_game.c hu_lib.c hu_stuff.c info.c i_cdmus.c i_endoom.c i_joystick.c i_scale.c i_sound.c i_system.c i_timer.c memio.c m_argv.c m_bbox.c m_cheat.c m_config.c m_controls.c m_fixed.c m_menu.c m_misc.c m_random.c p_ceilng.c p_doors.c p_enemy.c p_floor.c p_inter.c p_lights.c p_map.c p_maputl.c p_mobj.c p_plats.c p_pspr.c p_saveg.c p_setup.c p_sight.c p_spec.c p_switch.c p_telept.c p_tick.c p_user.c r_bsp.c r_data.c r_draw.c r_main.c r_plane.c r_segs.c r_sky.c r_things.c sha1.c sounds.c statdump.c st_lib.c st_stuff.c s_sound.c tables.c v_video.c wi_stuff.c w_checksum.c w_file.c w_wad.c z_zone.c i_input.c i_video.c doomgeneric.c
+-SRC_DOOM_SDL_SPECIFIC = doomgeneric_sdl.c mus2mid.c i_sdlmusic.c i_sdlsound.c file_misc.c
++SRC_DOOM = dummy.c am_map.c doomdef.c doomstat.c dstrings.c d_event.c d_items.c d_iwad.c d_loop.c d_main.c d_mode.c d_net.c f_finale.c f_wipe.c g_game.c hu_lib.c hu_stuff.c info.c i_cdmus.c i_endoom.c i_joystick.c i_scale.c i_sound.c i_system.c i_timer.c memio.c mus2mid.c m_argv.c m_bbox.c m_cheat.c m_config.c m_controls.c m_fixed.c m_menu.c m_misc.c m_random.c p_ceilng.c p_doors.c p_enemy.c p_floor.c p_inter.c p_lights.c p_map.c p_maputl.c p_mobj.c p_plats.c p_pspr.c p_saveg.c p_setup.c p_sight.c p_spec.c p_switch.c p_telept.c p_tick.c p_user.c r_bsp.c r_data.c r_draw.c r_main.c r_plane.c r_segs.c r_sky.c r_things.c sha1.c sounds.c statdump.c st_lib.c st_stuff.c s_sound.c tables.c v_video.c wi_stuff.c w_checksum.c w_file.c w_wad.c z_zone.c i_input.c i_video.c doomgeneric.c
++SRC_DOOM_SDL_SPECIFIC = doomgeneric_sdl.c i_sdlmusic.c i_sdlsound.c file_misc.c
+ 
+ OBJS += $(addprefix $(OUTPUT_DIR)/, $(patsubst %.c, %.o, $(SRC_DOOM)))
+ OBJS_SDL += $(addprefix $(OUTPUT_DIR_SDL_SPECIFIC)/, $(patsubst %.c, %.o, $(SRC_DOOM_SDL_SPECIFIC)))
+diff --git a/doomgeneric/include/i_swap.h b/doomgeneric/include/i_swap.h
+index 9a23fbe..5301249 100644
+--- a/doomgeneric/include/i_swap.h
++++ b/doomgeneric/include/i_swap.h
+@@ -19,7 +19,11 @@
+ #ifndef __I_SWAP__
+ #define __I_SWAP__
+ 
+-#ifdef FEATURE_SOUND
++// Endianness handling is not a sound feature; this block only ever meant
++// "SDL's headers are available". A port built without SDL (the WebAssembly
++// one) says so and takes the plain little-endian definitions below, while
++// still selecting a sound module with FEATURE_SOUND.
++#if defined(FEATURE_SOUND) && !defined(DG_WITHOUT_SDL)
+ 
+ #include <SDL_endian.h>
+ 
+@@ -60,6 +64,6 @@
+ 
+ #define SYS_LITTLE_ENDIAN
+ 
+-#endif /* FEATURE_SOUND */
++#endif /* defined(FEATURE_SOUND) && !defined(DG_WITHOUT_SDL) */
+ 
+ #endif
+diff --git a/doomgeneric/example_implementation/mus2mid.h b/doomgeneric/include/mus2mid.h
+similarity index 100%
+rename from doomgeneric/example_implementation/mus2mid.h
+rename to doomgeneric/include/mus2mid.h
+diff --git a/doomgeneric/src/i_sound.c b/doomgeneric/src/i_sound.c
+index c113e1b..a8a6ede 100644
+--- a/doomgeneric/src/i_sound.c
++++ b/doomgeneric/src/i_sound.c
+@@ -18,7 +18,7 @@
+ #include <stdio.h>
+ #include <stdlib.h>
+ 
+-#ifdef FEATURE_SOUND
++#if defined(FEATURE_SOUND) && !defined(DG_WITHOUT_SDL)
+ #include <SDL_mixer.h>
+ #endif
+ 
+@@ -61,8 +61,8 @@ int snd_sfxdevice = SNDDEVICE_SB;
+ 
+ extern void I_InitTimidityConfig(void);
+ #ifdef FEATURE_SOUND
+-extern sound_module_t *DG_sound_module;
+-extern music_module_t *DG_music_module;
++extern sound_module_t DG_sound_module;
++extern music_module_t DG_music_module;
+ #endif
+ extern sound_module_t sound_pcsound_module;
+ extern music_module_t music_opl_module;
+@@ -347,7 +347,7 @@ void I_BindSoundVariables(void) {
+   M_BindVariable("snd_samplerate", &snd_samplerate);
+   M_BindVariable("snd_cachesize", &snd_cachesize);
+ 
+-#ifdef FEATURE_SOUND
++#if defined(FEATURE_SOUND) && !defined(DG_WITHOUT_SDL)
+   M_BindVariable("use_libsamplerate", &use_libsamplerate);
+   M_BindVariable("libsamplerate_scale", &libsamplerate_scale);
+ #endif
+diff --git a/doomgeneric/src/m_config.c b/doomgeneric/src/m_config.c
+index b8b5511..832ba11 100644
+--- a/doomgeneric/src/m_config.c
++++ b/doomgeneric/src/m_config.c
+@@ -1066,7 +1066,7 @@ static default_t extra_defaults_list[] = {
+ 
+     CONFIG_VARIABLE_INT(dclick_use),
+ 
+-#ifdef FEATURE_SOUND
++#if defined(FEATURE_SOUND) && !defined(DG_WITHOUT_SDL)
+ 
+     //!
+     // Controls whether libsamplerate support is used for performing
+diff --git a/doomgeneric/example_implementation/mus2mid.c b/doomgeneric/src/mus2mid.c
+similarity index 99%
+rename from doomgeneric/example_implementation/mus2mid.c
+rename to doomgeneric/src/mus2mid.c
+index 6f990fc..42e2dd6 100644
+--- a/doomgeneric/example_implementation/mus2mid.c
++++ b/doomgeneric/src/mus2mid.c
+@@ -23,7 +23,6 @@
+ 
+ #include "memio.h"
+ #include "mus2mid.h"
+-#include "file_misc.h"
+ 
+ #define NUM_CHANNELS 16
+ 
+@@ -587,6 +586,8 @@ boolean mus2mid(MEMFILE *musinput, MEMFILE *midioutput) {
+ 
+ #ifdef STANDALONE
+ 
++#include "file_misc.h"
++
+ #include "m_misc.h"
+ #include "z_zone.h"
+ 
+diff --git a/src/doom_wasm.c b/src/doom_wasm.c
+index 200c541..ea8f366 100644
+--- a/src/doom_wasm.c
++++ b/src/doom_wasm.c
+@@ -1,10 +1,17 @@
+-#include <stdbool.h>
+ #include <stdio.h>
+ #include <string.h>
+ 
++#include "deh_str.h"
+ #include "doomgeneric.h"
+ #include "doom_wasm.h"
+ #include "file_embedded_in_code/DOOM1.WAD.h"
++#include "i_sound.h"
++#include "m_misc.h"
++#include "memio.h"
++#include "mus2mid.h"
++#include "sounds.h"
++#include "w_wad.h"
++#include "z_zone.h"
+ 
+ /*
+  * This file reconciles the WebAssembly interface (i.e. imports/exports)
+@@ -29,7 +36,7 @@
+ // A global cache of which keys are currently pressed down, according to what
+ // the user of this module has reported to via `reportKeyDown` and
+ // `reportKeyUp`.
+-static bool isKeyPressed[UINT8_MAX + 1] = {false};
++static boolean isKeyPressed[UINT8_MAX + 1] = {false};
+ 
+ void _initializeDoom() {
+   // Provide 0 command line arguments to Doom.
+@@ -125,7 +132,7 @@ int DG_GetKey(int *pressed, uint8_t *doomKey) {
+   // each time the Doom engine calls this function we're prepared to relay any
+   // key state changes that have been reported since the last call to this
+   // function. By default all the keys start in the "not pressed" state.
+-  static bool statePreviouslyCommunicated[UINT8_MAX] = {false};
++  static boolean statePreviouslyCommunicated[UINT8_MAX] = {false};
+ 
+   for (int i = 0; i < UINT8_MAX; i++) {
+     // If the actual state of this key doesn't match the last communicated state
+@@ -359,3 +366,229 @@ void DG_PCXScreenshotTaken(unsigned char *screenshotBytes,
+   // currently allow in this implementation (in fact, we don't allow the passing
+   // of ANY command line arguments to Doom).
+ }
++
++// *****************************************************************************
++// *                                    (3)                                    *
++// *                                                                           *
++// *      Implement Doom's low-level sound and music modules by forwarding     *
++// *                  to the functions imported via WebAssembly                *
++// *                                                                           *
++// *****************************************************************************
++
++/*
++ * Doom's sound layers are: `s_sound.c` decides what should be heard,
++ * `i_sound.c` picks a module, and the module actually makes noise. Only the
++ * last of those is host-specific, so it is the only one implemented here: the
++ * two module structs below fill the `DG_sound_module` / `DG_music_module`
++ * hooks that `i_sound.c` looks for, and every function that would touch an
++ * audio device instead calls the matching `audio` import.
++ *
++ * Sample data crosses the boundary once per sound, not once per play:
++ * `RegisterSfx` hands over a sound's lump the first time it is heard, and
++ * every later `startSound` names it by the id alone. So the host never needs
++ * to know how a WAD is laid out.
++ */
++
++// The channel handles Doom hands back to `S_StartSound` are the channel
++// numbers themselves, so `I_StopSound(handle)` and `channels[i].handle` agree
++// without a mapping table on this side.
++#define WASM_SOUND_MAX_CHANNELS 16
++
++// Whether each sound in `S_sfx` has been handed to `registerSound` yet.
++static boolean sfxRegistered[NUMSFX] = {false};
++
++static boolean RegisterSfx(sfxinfo_t *sfxinfo, int sfxId) {
++  if (sfxId < 0 || sfxId >= NUMSFX) {
++    return false;
++  }
++  if (sfxRegistered[sfxId]) {
++    return true;
++  }
++  if (sfxinfo->lumpnum < 0) {
++    return false;
++  }
++
++  const uint8_t *data = W_CacheLumpNum(sfxinfo->lumpnum, PU_STATIC);
++  registerSound(sfxId, data, W_LumpLength(sfxinfo->lumpnum));
++  sfxRegistered[sfxId] = true;
++  return true;
++}
++
++static boolean I_WASM_InitSound(boolean _use_sfx_prefix) {
++  (void)_use_sfx_prefix;
++  memset(sfxRegistered, 0, sizeof(sfxRegistered));
++  return true;
++}
++
++static void I_WASM_ShutdownSound(void) {
++  for (int channel = 0; channel < WASM_SOUND_MAX_CHANNELS; ++channel) {
++    stopSound(channel);
++  }
++}
++
++// Doom prefixes sound lump names with "DS"; `sfxinfo->link`, when set, names
++// the sound whose data should be heard in this one's place.
++static int I_WASM_GetSfxLumpNum(sfxinfo_t *sfxinfo) {
++  char namebuf[9];
++  sfxinfo_t *sfx = sfxinfo->link != NULL ? sfxinfo->link : sfxinfo;
++
++  M_snprintf(namebuf, sizeof(namebuf), "ds%s", DEH_String(sfx->name));
++
++  return W_GetNumForName(namebuf);
++}
++
++// The host owns its own mixing, so there is nothing to pump from here.
++static void I_WASM_UpdateSound(void) {}
++
++static void I_WASM_UpdateSoundParams(int channel, int volume, int separation) {
++  updateSoundParams(channel, volume, separation);
++}
++
++static int I_WASM_StartSound(sfxinfo_t *sfxinfo, int channel, int volume,
++                             int separation) {
++  int sfxId = (int)(sfxinfo - S_sfx);
++
++  if (!RegisterSfx(sfxinfo, sfxId)) {
++    return -1;
++  }
++
++  startSound(sfxId, channel, volume, separation);
++  return channel;
++}
++
++static void I_WASM_StopSound(int channel) { stopSound(channel); }
++
++static boolean I_WASM_SoundIsPlaying(int channel) {
++  return soundIsPlaying(channel) != 0;
++}
++
++// Nothing to do: `I_WASM_StartSound` registers a sound the first time it is
++// heard, so there is no second path to keep in step here.
++//
++// Precaching would also have to resolve every lump itself rather than trust
++// `sfxinfo->lumpnum`. `S_Init` calls this before the loop that sets each
++// `lumpnum` to -1, so at this point they are all still zero -- which is a
++// real lump (`PLAYPAL`), not an obviously invalid one.
++static void I_WASM_PrecacheSounds(sfxinfo_t *sounds, int num_sounds) {
++  (void)sounds;
++  (void)num_sounds;
++}
++
++static boolean I_WASM_InitMusic(void) { return true; }
++
++static void I_WASM_ShutdownMusic(void) { stopSong(); }
++
++static void I_WASM_SetMusicVolume(int volume) { setMusicVolume(volume); }
++
++static void I_WASM_PauseSong(void) { pauseSong(); }
++
++static void I_WASM_ResumeSong(void) { resumeSong(); }
++
++// Doom's music lumps are MUS, its own compact MIDI encoding, which nothing
++// outside Doom plays. Converting here rather than at the import boundary
++// means a host needs only a MIDI player, and matches what the SDL module
++// does before handing a lump to SDL_mixer.
++#define MUS_HEADER_MAGIC "MUS\x1a"
++// The largest MIDI a MUS lump is expected to produce; the SDL module uses
++// the same bound.
++#define MAX_MIDI_LENGTH (96 * 1024)
++
++static boolean IsMus(const byte *data, int len) {
++  return len > 3 && memcmp(data, MUS_HEADER_MAGIC, 4) == 0;
++}
++
++// Doom treats the handle as an opaque pointer and only checks it against
++// NULL, so the host's non-zero handle travels as one. A host that declines
++// the music answers 0, which becomes NULL and leaves Doom silent.
++static void *I_WASM_RegisterSong(void *data, int len) {
++  int32_t handle = 0;
++
++  if (IsMus((const byte *)data, len)) {
++    MEMFILE *musinput = mem_fopen_read(data, len);
++    MEMFILE *midioutput = mem_fopen_write();
++
++    if (musinput != NULL && midioutput != NULL &&
++        !mus2mid(musinput, midioutput)) {
++      void *midi;
++      size_t midilen;
++
++      mem_get_buf(midioutput, &midi, &midilen);
++      if (midilen <= MAX_MIDI_LENGTH) {
++        handle = registerSong((const uint8_t *)midi, midilen);
++      }
++    }
++
++    if (musinput != NULL) {
++      mem_fclose(musinput);
++    }
++    if (midioutput != NULL) {
++      mem_fclose(midioutput);
++    }
++  } else {
++    // Already a MIDI (a PWAD may substitute one), so pass it straight on.
++    handle = registerSong((const uint8_t *)data, (size_t)len);
++  }
++
++  return handle == 0 ? NULL : (void *)(intptr_t)handle;
++}
++
++static void I_WASM_UnRegisterSong(void *handle) {
++  if (handle != NULL) {
++    unregisterSong((int32_t)(intptr_t)handle);
++  }
++}
++
++static void I_WASM_PlaySong(void *handle, boolean looping) {
++  if (handle != NULL) {
++    playSong((int32_t)(intptr_t)handle, looping ? 1 : 0);
++  }
++}
++
++static void I_WASM_StopSong(void) { stopSong(); }
++
++static boolean I_WASM_MusicIsPlaying(void) { return songIsPlaying() != 0; }
++
++static void I_WASM_PollMusic(void) {}
++
++// `i_sound.c` matches a module against the configured device before using it.
++// These are the device lists the SDL modules claim, which is every device a
++// host that mixes for itself can stand in for.
++static snddevice_t sound_wasm_devices[] = {
++    SNDDEVICE_SB,          SNDDEVICE_PAS,         SNDDEVICE_GUS,
++    SNDDEVICE_WAVEBLASTER, SNDDEVICE_SOUNDCANVAS, SNDDEVICE_AWE32,
++};
++
++static snddevice_t music_wasm_devices[] = {
++    SNDDEVICE_PAS,         SNDDEVICE_GUS,     SNDDEVICE_WAVEBLASTER,
++    SNDDEVICE_SOUNDCANVAS, SNDDEVICE_GENMIDI, SNDDEVICE_AWE32,
++};
++
++sound_module_t DG_sound_module = {
++    sound_wasm_devices,
++    sizeof(sound_wasm_devices) / sizeof(*sound_wasm_devices),
++    I_WASM_InitSound,
++    I_WASM_ShutdownSound,
++    I_WASM_GetSfxLumpNum,
++    I_WASM_UpdateSound,
++    I_WASM_UpdateSoundParams,
++    I_WASM_StartSound,
++    I_WASM_StopSound,
++    I_WASM_SoundIsPlaying,
++    I_WASM_PrecacheSounds,
++};
++
++music_module_t DG_music_module = {
++    music_wasm_devices,
++    sizeof(music_wasm_devices) / sizeof(*music_wasm_devices),
++    I_WASM_InitMusic,
++    I_WASM_ShutdownMusic,
++    I_WASM_SetMusicVolume,
++    I_WASM_PauseSong,
++    I_WASM_ResumeSong,
++    I_WASM_RegisterSong,
++    I_WASM_UnRegisterSong,
++    I_WASM_PlaySong,
++    I_WASM_StopSong,
++    I_WASM_MusicIsPlaying,
++    I_WASM_PollMusic,
++};
+diff --git a/src/doom_wasm.h b/src/doom_wasm.h
+index 8b226ab..0d2ce3b 100644
+--- a/src/doom_wasm.h
++++ b/src/doom_wasm.h
+@@ -217,6 +217,133 @@ void onErrorMessage(const char *message, size_t length);
+  */
+ IMPORT_MODULE("runtimeControl") uint64_t timeInMilliseconds();
+ 
++/*
++ * Register the sample data for one sound effect
++ *
++ * Called at most once per `sfxId`, before the first `startSound` naming it.
++ * The data is a DMX sound lump: an 8-byte header (a 16-bit format field that
++ * is always 3, a 16-bit sample rate, and a 32-bit sample count) followed by
++ * unsigned 8-bit mono samples, of which DMX ignores the first and last 16.
++ *
++ * args:
++ *  sfxId:
++ *    - identifies this sound effect for the whole run
++ *  data:
++ *    - location in memory of the sound lump
++ *  length:
++ *    - length, in bytes, of the sound lump
++ */
++IMPORT_MODULE("audio")
++void registerSound(int32_t sfxId, const uint8_t *data, size_t length);
++
++/*
++ * Start a sound effect on a channel, replacing whatever plays there
++ *
++ * args:
++ *  sfxId:
++ *    - a sound effect previously handed to `registerSound`
++ *  channel:
++ *    - the channel to play on, in the range [0, 16)
++ *  volume:
++ *    - range [0, 127]
++ *  separation:
++ *    - stereo position, range [0, 254]; 128 is centred
++ */
++IMPORT_MODULE("audio")
++void startSound(int32_t sfxId, int32_t channel, int32_t volume,
++                int32_t separation);
++
++/*
++ * Stop whatever is playing on a channel
++ */
++IMPORT_MODULE("audio") void stopSound(int32_t channel);
++
++/*
++ * Change the volume and stereo position of a playing channel
++ *
++ * Called as the listener or the sound's origin moves, on a channel that
++ * `startSound` was previously called for.
++ */
++IMPORT_MODULE("audio")
++void updateSoundParams(int32_t channel, int32_t volume, int32_t separation);
++
++/*
++ * Report whether a channel still has sound playing on it
++ *
++ * returns:
++ *  non-zero if the channel is still playing, 0 otherwise
++ */
++IMPORT_MODULE("audio") int32_t soundIsPlaying(int32_t channel);
++
++/*
++ * Register a piece of music, returning a handle for it
++ *
++ * The data is a standard MIDI file. Doom's own music lumps are in its
++ * compact MUS encoding, which this module converts before calling this
++ * function, so that a host needs only a MIDI player.
++ *
++ * args:
++ *  data:
++ *    - location in memory of the music lump
++ *  length:
++ *    - length, in bytes, of the music lump
++ *
++ * returns:
++ *  A non-zero handle naming this music for `playSong` and `unregisterSong`,
++ *  or 0 if the music could not be registered, in which case Doom plays no
++ *  music rather than reporting an error.
++ */
++IMPORT_MODULE("audio")
++int32_t registerSong(const uint8_t *data, size_t length);
++
++/*
++ * Release a handle previously returned by `registerSong`
++ */
++IMPORT_MODULE("audio") void unregisterSong(int32_t handle);
++
++/*
++ * Start playing a piece of music, replacing whatever is playing
++ *
++ * args:
++ *  handle:
++ *    - a handle previously returned by `registerSong`
++ *  looping:
++ *    - non-zero to repeat the music until stopped
++ */
++IMPORT_MODULE("audio") void playSong(int32_t handle, int32_t looping);
++
++/*
++ * Stop the music that is playing, if any
++ */
++IMPORT_MODULE("audio") void stopSong();
++
++/*
++ * Pause the music that is playing, if any
++ */
++IMPORT_MODULE("audio") void pauseSong();
++
++/*
++ * Resume music paused by `pauseSong`
++ */
++IMPORT_MODULE("audio") void resumeSong();
++
++/*
++ * Set the music volume
++ *
++ * args:
++ *  volume:
++ *    - range [0, 127]
++ */
++IMPORT_MODULE("audio") void setMusicVolume(int32_t volume);
++
++/*
++ * Report whether music is currently playing
++ *
++ * returns:
++ *  non-zero if music is playing, 0 otherwise
++ */
++IMPORT_MODULE("audio") int32_t songIsPlaying();
++
+ /*
+  * Report the size, in bytes, of a specific save game
+  *
+-- 
+2.43.0
+
