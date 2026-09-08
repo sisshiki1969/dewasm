@@ -41,8 +41,10 @@ class DoomAudio
     @samples = {}
     @channels = {}
     @songs = {}
+    @next_song_handle = 0
     @playing = nil
     @music_volume = 1.0
+    @music_warned = false
     @dir = Dir.mktmpdir("dewasm-doom-audio")
     at_exit { FileUtils.remove_entry(@dir) if File.directory?(@dir) }
   end
@@ -128,16 +130,40 @@ class DoomAudio
 
   def volume_of(volume) = (volume / MAX_VOLUME).clamp(0.0, 1.0)
 
+  # Handles count up rather than reusing the free ones, so a song's file is
+  # never rewritten under a `Gosu::Song` that still holds it: Doom unregisters
+  # the previous song before registering the next, which would otherwise put
+  # both at handle 1.
   def register_song(ptr, length)
-    handle = @songs.size + 1
+    handle = (@next_song_handle += 1)
     path = File.join(@dir, "song#{handle}.mid")
     File.binwrite(path, @memory.get_string(ptr, length))
     @songs[handle] = Gosu::Song.new(path)
     handle
   rescue StandardError => e
-    warn "audio: music not registered (#{e.class}: #{e.message})"
+    warn_music_unavailable(e)
     # 0 tells Doom the music could not be registered; it then plays none.
     0
+  end
+
+  # Doom re-registers on every level change, so the same cause would be
+  # reported over and over; say it once.
+  #
+  # Music is MIDI, so it needs a synthesiser behind SDL2_mixer (fluidsynth with
+  # a soundfont, or timidity with a patch set) that the effects, being PCM, do
+  # not: an SDL2_mixer built without one plays every effect and no music, which
+  # is worth naming because the loader only reports the format as unsupported.
+  # A device that will not open at all is the other case, and MIDI is not its
+  # cause.
+  def warn_music_unavailable(err)
+    return if @music_warned
+
+    @music_warned = true
+    warn "audio: music unavailable (#{err.class}: #{err.message})"
+    return if err.message.include?("Mix_OpenAudio")
+
+    warn "audio: SDL2_mixer needs a MIDI synthesiser: point SDL_SOUNDFONTS at a .sf2 file, " \
+         "or install timidity. Sound effects need none and are unaffected."
   end
 
   def unregister_song(handle)
