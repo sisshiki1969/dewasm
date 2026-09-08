@@ -13,6 +13,17 @@ require "tmpdir"
 # gosu loads samples and songs from files rather than from memory, so each
 # registration is written to a temporary file first, which is also what Doom's
 # own SDL backend does with music.
+# The module's memory, as seen from an import that runs after construction.
+#
+# Doom hands over sample data by address, so the audio host reads the same
+# memory the other imports do; like them it is built before `Doom.new`
+# returns the instance it reads from.
+class DeferredMemory
+  def initialize(doom_holder) = @doom_holder = doom_holder
+
+  def get_string(offset, length) = @doom_holder[0].memory.buffer.get_string(offset, length)
+end
+
 class DoomAudio
   # Doom's `sep` runs 0 (hard left) to 254 (hard right); 127 is centred.
   # Its volumes run 0 to 127.

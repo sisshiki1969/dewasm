@@ -535,6 +535,14 @@ end
 const RUBY_DOOM_FRAME_GLUE: &str = r#"frame = { off: nil, w: 0, h: 0 }
 ms = [0]
 imports = {
+  "audio" => {
+    "registerSound" => ->(i, d, n) {}, "startSound" => ->(i, c, v, s) {},
+    "stopSound" => ->(c) {}, "updateSoundParams" => ->(c, v, s) {},
+    "soundIsPlaying" => ->(c) { 0 }, "registerSong" => ->(d, n) { 0 },
+    "unregisterSong" => ->(h) {}, "playSong" => ->(h, l) {},
+    "stopSong" => -> {}, "pauseSong" => -> {}, "resumeSong" => -> {},
+    "setMusicVolume" => ->(v) {}, "songIsPlaying" => -> { 0 },
+  },
   "console" => { "onErrorMessage" => ->(o, n) {}, "onInfoMessage" => ->(o, n) {} },
   "gameSaving" => {
     "sizeOfSaveGame" => ->(i) { 0 },

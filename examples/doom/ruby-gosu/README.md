@@ -4,7 +4,8 @@ An interactive DOOM frontend that renders into a window with [gosu](https://www.
 The sibling [`../ruby`](../ruby) frontend draws the same game into a terminal; this one takes a real window.
 
 `build.sh` fetches jacobenget/doom.wasm (checksum-pinned into the shared apps cache) and converts it to Ruby with dewasm (`doom_gen.rb`, ~10MB, gitignored, regenerated on every build).
-`main.rb` implements the module's ten host imports (console logging, save-game I/O, the game clock, and frame delivery) plus the gosu window, its renderer and its keyboard input.
+`main.rb` implements the module's host imports (console logging, save-game I/O, the game clock, and frame delivery) plus the gosu window, its renderer and its keyboard input.
+`audio.rb` implements the thirteen audio imports: it wraps each DMX sound lump the module hands over in a WAV container for `Gosu::Sample`, and writes the MIDI the module converts from Doom's MUS encoding to a file for `Gosu::Song`.
 
 ## Requirements
 

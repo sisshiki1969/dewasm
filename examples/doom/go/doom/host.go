@@ -1,4 +1,4 @@
-// Package doom is the dewasm-generated DOOM library (doom_gen.go, produced from jacobenget/doom.wasm by build.sh) plus the host frontend that drives it: this file wires the wasm module's ten host imports to real OS facilities (stdio, save-game files, a monotonic clock) and runs the game loop with ebiten for rendering and keyboard input.
+// Package doom is the dewasm-generated DOOM library (doom_gen.go, produced from jacobenget/doom.wasm by build.sh) plus the host frontend that drives it: this file wires the wasm module's host imports to real OS facilities (stdio, save-game files, a monotonic clock) and runs the game loop with ebiten for rendering and keyboard input.
 //
 // The frontend lives *inside* the generated package rather than beside it because it reads the module's linear memory (doomInst.memory.data) and its exported globals (*global[uint32]) directly, unexported identifiers only a file in the same package can name. ../main.go is the command: it imports this package and calls Run.
 //
@@ -118,8 +118,44 @@ func hostOnGameInit(width, height uint32) {
 	frameBuf = make([]byte, frameW*frameH*4)
 }
 
+// This frontend renders but does not play: every audio import is answered
+// with the least the module will accept. A wasm import cannot be left out,
+// so silence has to be spelled rather than omitted.
+//
+// Declining every sound (`registerSound` stores nothing, `startSound` plays
+// nothing) and reporting nothing playing is a state Doom already handles: it
+// is what a machine with no sound device looked like.
+func hostRegisterSound(sfxID, data, length uint32)             {}
+func hostStartSound(sfxID, channel, volume, separation uint32) {}
+func hostStopSound(channel uint32)                             {}
+func hostUpdateSoundParams(channel, volume, separation uint32) {}
+func hostSoundIsPlaying(channel uint32) uint32                 { return 0 }
+func hostRegisterSong(data, length uint32) uint32              { return 0 }
+func hostUnregisterSong(handle uint32)                         {}
+func hostPlaySong(handle, looping uint32)                      {}
+func hostStopSong()                                            {}
+func hostPauseSong()                                           {}
+func hostResumeSong()                                          {}
+func hostSetMusicVolume(volume uint32)                         {}
+func hostSongIsPlaying() uint32                                { return 0 }
+
 func buildImports() Imports {
 	return Imports{
+		"audio": map[string]any{
+			"registerSound":     hostRegisterSound,
+			"startSound":        hostStartSound,
+			"stopSound":         hostStopSound,
+			"updateSoundParams": hostUpdateSoundParams,
+			"soundIsPlaying":    hostSoundIsPlaying,
+			"registerSong":      hostRegisterSong,
+			"unregisterSong":    hostUnregisterSong,
+			"playSong":          hostPlaySong,
+			"stopSong":          hostStopSong,
+			"pauseSong":         hostPauseSong,
+			"resumeSong":        hostResumeSong,
+			"setMusicVolume":    hostSetMusicVolume,
+			"songIsPlaying":     hostSongIsPlaying,
+		},
 		"console": map[string]any{
 			"onErrorMessage": hostOnErrorMessage,
 			"onInfoMessage":  hostOnInfoMessage,

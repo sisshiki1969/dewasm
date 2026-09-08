@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Interactive frontend for the dewasm-generated DOOM library (doom_gen.py,
 produced from jacobenget/doom.wasm by build.sh). It wires the wasm module's
-ten host imports to real OS facilities (raw-terminal stdio, save-game files,
+host imports to real OS facilities (raw-terminal stdio, save-game files,
 a monotonic clock) and renders the framebuffer straight into the terminal as
 24-bit-color half-blocks: no window, no GPU, just ANSI escapes.
 
@@ -127,6 +127,26 @@ IMPORTS = {
     "console": {
         "onErrorMessage": on_error_message,
         "onInfoMessage": on_info_message,
+    },
+    # This frontend renders but does not play: every audio import is answered
+    # with the least the module will accept. A wasm import cannot be left out,
+    # so silence has to be spelled rather than omitted. Declining every sound
+    # and reporting nothing playing is a state Doom already handles -- it is
+    # what a machine with no sound device looked like.
+    "audio": {
+        "registerSound": lambda sfx_id, data, length: None,
+        "startSound": lambda sfx_id, channel, volume, separation: None,
+        "stopSound": lambda channel: None,
+        "updateSoundParams": lambda channel, volume, separation: None,
+        "soundIsPlaying": lambda channel: 0,
+        "registerSong": lambda data, length: 0,
+        "unregisterSong": lambda handle: None,
+        "playSong": lambda handle, looping: None,
+        "stopSong": lambda: None,
+        "pauseSong": lambda: None,
+        "resumeSong": lambda: None,
+        "setMusicVolume": lambda volume: None,
+        "songIsPlaying": lambda: 0,
     },
     "gameSaving": {
         "sizeOfSaveGame": size_of_save_game,

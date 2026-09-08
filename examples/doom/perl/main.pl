@@ -34,7 +34,7 @@ sub monotonic { return clock_gettime(CLOCK_MONOTONIC); }
 
 sub save_game_path { return SAVE_DIR . "/doomsav$_[0].dsg"; }
 
-# Wires the wasm module's ten host imports to Perl.
+# Wires the wasm module's host imports to Perl.
 # `$doom_ref` exists because these closures have to be built before Doom->new returns the instance they read memory from; it's filled in immediately after construction and only dereferenced within calls the imports themselves receive later (never during Doom->new itself).
 sub build_imports {
     my ($doom_ref, $frame, $suppress_info) = @_;
@@ -83,6 +83,27 @@ sub build_imports {
                 my $len = $frame->{w} * $frame->{h} * 4;
                 $frame->{pixels} = $mem_string->($buf_off, $len);
             },
+        },
+        # This frontend renders but does not play: every audio import is
+        # answered with the least the module will accept. A wasm import
+        # cannot be left out, so silence has to be spelled rather than
+        # omitted. Declining every sound and reporting nothing playing is a
+        # state Doom already handles -- it is what a machine with no sound
+        # device looked like.
+        'audio' => {
+            'registerSound' => sub { },
+            'startSound' => sub { },
+            'stopSound' => sub { },
+            'updateSoundParams' => sub { },
+            'soundIsPlaying' => sub { 0 },
+            'registerSong' => sub { 0 },
+            'unregisterSong' => sub { },
+            'playSong' => sub { },
+            'stopSong' => sub { },
+            'pauseSong' => sub { },
+            'resumeSong' => sub { },
+            'setMusicVolume' => sub { },
+            'songIsPlaying' => sub { 0 },
         },
         'loading' => {
             'onGameInit' => sub { ($frame->{w}, $frame->{h}) = @_; },

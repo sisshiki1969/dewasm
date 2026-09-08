@@ -1,7 +1,7 @@
 # DOOM (Ruby, ANSI terminal)
 
 An interactive DOOM frontend that renders into the terminal instead of a window (see `../go` and `../java` for the pixel-window frontends).
-`build.sh` fetches jacobenget/doom.wasm (checksum-pinned into the shared apps cache) and converts it to Ruby with dewasm (`doom_gen.rb`, ~11MB, gitignored, regenerated on every build) and `main.rb` implements the module's ten host imports (console logging, save-game I/O, the game clock, and frame delivery) plus a terminal renderer and raw-mode keyboard input.
+`build.sh` fetches jacobenget/doom.wasm (checksum-pinned into the shared apps cache) and converts it to Ruby with dewasm (`doom_gen.rb`, ~11MB, gitignored, regenerated on every build) and `main.rb` implements the module's host imports (console logging, save-game I/O, the game clock, frame delivery, and thirteen audio imports it answers silently) plus a terminal renderer and raw-mode keyboard input.
 A terminal is not a downgrade here: the Ruby backend only manages ~15 ticks/sec under YJIT, far below what a GUI needs but plenty for a terminal, which has orders of magnitude fewer cells to redraw than a window has pixels.
 
 ## Run

@@ -19,7 +19,7 @@ def save_game_path(id)
   File.join(SAVE_DIR, "doomsav#{id}.dsg")
 end
 
-# Wires the wasm module's ten host imports to Ruby.
+# Wires the wasm module's host imports to Ruby.
 # `doom_holder` exists because these closures have to be built before Doom.new returns the instance they read memory from; it's filled in immediately after construction and only read from within calls the imports themselves receive later (never during Doom.new itself).
 def build_imports(doom_holder, frame_state, suppress_info:)
   {
@@ -34,6 +34,24 @@ def build_imports(doom_holder, frame_state, suppress_info:)
 
         puts doom_holder[0].memory.buffer.get_string(off, len)
       end,
+    },
+    # This frontend renders but does not play: every audio import is answered with the least the module will accept.
+    # A wasm import cannot be left out, so silence has to be spelled rather than omitted.
+    # Declining every sound and reporting nothing playing is a state DOOM already handles: it is what a machine with no sound device looked like.
+    "audio" => {
+      "registerSound" => lambda { |_sfx_id, _data, _length| },
+      "startSound" => lambda { |_sfx_id, _channel, _volume, _separation| },
+      "stopSound" => lambda { |_channel| },
+      "updateSoundParams" => lambda { |_channel, _volume, _separation| },
+      "soundIsPlaying" => lambda { |_channel| 0 },
+      "registerSong" => lambda { |_data, _length| 0 },
+      "unregisterSong" => lambda { |_handle| },
+      "playSong" => lambda { |_handle, _looping| },
+      "stopSong" => lambda { 0 },
+      "pauseSong" => lambda { 0 },
+      "resumeSong" => lambda { 0 },
+      "setMusicVolume" => lambda { |_volume| },
+      "songIsPlaying" => lambda { 0 },
     },
     "gameSaving" => {
       "sizeOfSaveGame" => lambda do |id|

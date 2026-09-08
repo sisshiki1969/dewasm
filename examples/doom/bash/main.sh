@@ -96,6 +96,25 @@ imp_draw_frame() {
   return 0
 }
 
+# This frontend renders but does not play: every audio import is answered with
+# the least the module will accept. A wasm import cannot be left out, so
+# silence has to be spelled rather than omitted. Declining every sound and
+# reporting nothing playing is a state Doom already handles: it is what a
+# machine with no sound device looked like.
+imp_register_sound() { R0=; return 0; }
+imp_start_sound() { R0=; return 0; }
+imp_stop_sound() { R0=; return 0; }
+imp_update_sound_params() { R0=; return 0; }
+imp_sound_is_playing() { R0=0; return 0; }
+imp_register_song() { R0=0; return 0; }
+imp_unregister_song() { R0=; return 0; }
+imp_play_song() { R0=; return 0; }
+imp_stop_song() { R0=; return 0; }
+imp_pause_song() { R0=; return 0; }
+imp_resume_song() { R0=; return 0; }
+imp_set_music_volume() { R0=; return 0; }
+imp_song_is_playing() { R0=0; return 0; }
+
 # Leaving both output slots untouched selects the wasm-embedded shareware
 # WAD; external WADs are out of scope for this frontend (see ../ruby).
 imp_wad_sizes() { R0=; return 0; }
@@ -111,6 +130,19 @@ imp_on_game_init() {
 # Read by doom_rt_resolve_import in the sourced doom_gen.sh (IMPORTS[mod.name]), not anywhere in this script, hence the unused-variable suppression.
 # shellcheck disable=SC2034
 declare -A IMPORTS=(
+  ['audio.registerSound']=imp_register_sound
+  ['audio.startSound']=imp_start_sound
+  ['audio.stopSound']=imp_stop_sound
+  ['audio.updateSoundParams']=imp_update_sound_params
+  ['audio.soundIsPlaying']=imp_sound_is_playing
+  ['audio.registerSong']=imp_register_song
+  ['audio.unregisterSong']=imp_unregister_song
+  ['audio.playSong']=imp_play_song
+  ['audio.stopSong']=imp_stop_song
+  ['audio.pauseSong']=imp_pause_song
+  ['audio.resumeSong']=imp_resume_song
+  ['audio.setMusicVolume']=imp_set_music_volume
+  ['audio.songIsPlaying']=imp_song_is_playing
   ['console.onErrorMessage']=imp_on_error
   ['console.onInfoMessage']=imp_on_info
   ['gameSaving.sizeOfSaveGame']=imp_size_of_save

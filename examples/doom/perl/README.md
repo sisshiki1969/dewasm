@@ -1,7 +1,7 @@
 # DOOM (Perl, ANSI terminal)
 
 An interactive frontend for the DOOM shareware episode that renders straight into the terminal: no window, no GPU (see `../go` and `../java` for the pixel-window frontends).
-`build.sh` fetches jacobenget/doom.wasm (checksum-pinned into the shared apps cache) and converts it to Perl with dewasm (`doom_gen.pl`, ~12MB, gitignored, regenerated on every build) and `main.pl` implements the module's ten host imports (console messages, save-game files, the game clock, and frame delivery), draws the framebuffer as 24-bit-color half-blocks, and reads keys from the terminal in raw mode.
+`build.sh` fetches jacobenget/doom.wasm (checksum-pinned into the shared apps cache) and converts it to Perl with dewasm (`doom_gen.pl`, ~12MB, gitignored, regenerated on every build) and `main.pl` implements the module's host imports (console messages, save-game files, the game clock, frame delivery, and thirteen audio imports it answers silently), draws the framebuffer as 24-bit-color half-blocks, and reads keys from the terminal in raw mode.
 Core modules only: no CPAN installs.
 Raw mode goes through `stty` because `Term::ReadKey` is not core.
 
