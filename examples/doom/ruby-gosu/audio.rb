@@ -164,11 +164,10 @@ class DoomAudio
 
   def pause_song = @playing&.pause
 
-  def resume_song
-    # gosu resumes a paused song by playing it again; `Song#play` on the
-    # current song is what un-pauses it.
-    @playing&.play(true)
-  end
+  # Gosu documents `Song#play` as "Starts or resumes playback of the song",
+  # so playing the paused song is how it is un-paused. Doom pauses for the
+  # menu and resumes on dismissing it.
+  def resume_song = @playing&.play(true)
 
   def set_music_volume(volume)
     @music_volume = volume_of(volume)
