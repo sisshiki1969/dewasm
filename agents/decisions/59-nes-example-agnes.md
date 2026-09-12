@@ -4,6 +4,7 @@ Status: **Accepted, 2026-08-04.**
 `examples/nes` runs a NES emulator converted with `--mode library` on all six backends, in the DOOM demo's shape ([decision 50](50-doom-example-shape.md)): one wasm artifact, per-language native frontends, a deterministic framebuffer snapshot ([decision 53](53-doom-frame-snapshot.md)/[decision 56](56-unified-snapshot-regeneration.md)).
 Unlike DOOM there is no suitable upstream binary, so `examples/apps/scripts/nes.sh` builds `nes.wasm` from a pinned emulation library plus a thin wrapper checked in at `examples/apps/src/nes_demo.c`.
 Amended 2026-08-04: the frame is handed over as agnes's own palette-index buffer plus its palette (`screenOffset`/`paletteOffset`) instead of a BGRA image rendered in-guest, which cost 12-15% of frame time on every backend and told the host nothing it could not compose itself (issue #117); the composed pixels are identical, so the pinned snapshot is unchanged.
+Extended with `ruby/gui/`, a windowed Ruby frontend on gosu sharing the terminal frontend's generated library; the second-frontend rationale and the bundler scoping are recorded with the DOOM example's counterpart in [decision 50](50-doom-example-shape.md).
 
 ## Context
 
