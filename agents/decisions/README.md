@@ -117,6 +117,7 @@ An entry is numbered: `<N>-<slug>.md`, cited as "decision N".
 | 95 | [cowsay Comes From Our Own Implementation, Published Upstream](95-cowsay-own-implementation.md) | Accepted |
 | 96 | [Generated Output Must Survive Ahead-of-Time Compilation](96-generated-code-compiles-ahead-of-time.md) | Accepted |
 | 97 | [A Host Library the Runtime May Lack Is Optional, and Its Absence Is Refused, Not Faked](97-optional-host-libraries.md) | Accepted |
+| 98 | [Extend the Guest When the Interface, Not the Frontend, Is What Is Missing](98-doom-audio-interface.md) | Accepted |
 
 ## Adding a new decision
 

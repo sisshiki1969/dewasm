@@ -10,6 +10,7 @@
 # Run with --smoke for a headless self-check (no window, no display needed).
 
 require_relative "../doom_gen"
+require_relative "audio"
 require "gosu"
 
 SAVE_DIR = ".savegame"
@@ -18,10 +19,11 @@ def save_game_path(id)
   File.join(SAVE_DIR, "doomsav#{id}.dsg")
 end
 
-# Wires the wasm module's ten host imports to Ruby.
+# Wires the wasm module's host imports to Ruby.
 # `doom_holder` exists because these closures have to be built before Doom.new returns the instance they read memory from; it's filled in immediately after construction and only read from within calls the imports themselves receive later (never during Doom.new itself).
-def build_imports(doom_holder, frame_state)
+def build_imports(doom_holder, frame_state, audio)
   {
+    "audio" => audio.imports,
     "console" => {
       "onErrorMessage" => lambda do |off, len|
         warn doom_holder[0].memory.buffer.get_string(off, len)
@@ -277,7 +279,9 @@ end
 def start_doom
   frame_state = { width: 0, height: 0, rgba: nil, buf_off: nil, converter: nil }
   doom_holder = [nil]
-  doom = Doom.new(build_imports(doom_holder, frame_state))
+  # Reads the sound and music lumps the module hands over, so it takes the same deferred view of memory the other imports do.
+  audio = DoomAudio.new(DeferredMemory.new(doom_holder))
+  doom = Doom.new(build_imports(doom_holder, frame_state, audio))
   doom_holder[0] = doom
   doom.invoke("initGame")
   # initGame renders the title screen, so a frame has been through FrameConverter by now and out_w/out_h have settled; the window sizes itself from them, and would pick the unhalved 640x400 if this were ever not true.
