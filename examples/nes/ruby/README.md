@@ -1,6 +1,7 @@
 # NES (Ruby, ANSI terminal)
 
 An interactive NES frontend that renders into the terminal instead of a window (see `../go` for the pixel-window frontend).
+The [`gui/`](gui/) subdirectory runs the same generated library in a real window with gosu, sharing this directory's `nes_gen.rb`; its real key releases feed `setInput`'s bitmask directly instead of the hold-window synthesis below.
 `build.sh` builds `cache/nes.wasm` (an [agnes](https://github.com/kgabis/agnes)-based emulator wrapped by `examples/apps/src/nes_demo.c`) via `examples/apps/scripts/nes.sh` and converts it to Ruby with dewasm (`nes_gen.rb`, gitignored, regenerated on every build).
 Unlike `../../doom`, `nes.wasm` has **zero host imports** (there is nothing to wire up), so `main.rb` only loads a ROM into the module's linear memory and drives the game loop itself: pacing, input polling, and frame presentation are entirely the host's job (the module has no clock import of its own to pace against, unlike DOOM's internal 35Hz timer).
 
