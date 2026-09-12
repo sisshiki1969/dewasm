@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Interactive frontend for the dewasm-generated DOOM library (doom_gen.py,
 produced from jacobenget/doom.wasm by build.sh). It wires the wasm module's
-ten host imports to real OS facilities (raw-terminal stdio, save-game files,
+host imports to real OS facilities (raw-terminal stdio, save-game files,
 a monotonic clock) and renders the framebuffer straight into the terminal as
 24-bit-color half-blocks: no window, no GPU, just ANSI escapes.
 
@@ -25,6 +25,17 @@ import tty
 import doom_gen
 
 SAVE_DIR = ".savegame"
+
+# This frontend renders but does not play, and a wasm import cannot be left out,
+# so silence is spelled rather than omitted. One answer serves all thirteen: 0
+# is "no song handle" and "nothing playing" for the three that return a value,
+# and discarded for the ten that do not. It is what DOOM did on a machine with
+# no sound device.
+AUDIO_IMPORTS = (
+    "registerSound", "startSound", "stopSound", "updateSoundParams", "soundIsPlaying",
+    "registerSong", "unregisterSong", "playSong", "stopSong", "pauseSong",
+    "resumeSong", "setMusicVolume", "songIsPlaying",
+)
 
 # reportKeyDown/reportKeyUp expect the module's KEY_* global values, looked up once after the module is constructed (they're plain ints, not globals that can change at runtime).
 KEY_NAMES = (
@@ -128,6 +139,7 @@ IMPORTS = {
         "onErrorMessage": on_error_message,
         "onInfoMessage": on_info_message,
     },
+    "audio": dict.fromkeys(AUDIO_IMPORTS, lambda *_: 0),
     "gameSaving": {
         "sizeOfSaveGame": size_of_save_game,
         "readSaveGame": read_save_game,

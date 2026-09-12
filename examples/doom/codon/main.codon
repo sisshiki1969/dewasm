@@ -1,5 +1,5 @@
 """Interactive frontend for the dewasm-generated DOOM library (doom_gen.codon,
-produced from jacobenget/doom.wasm by build.sh). It wires the wasm module's ten
+produced from jacobenget/doom.wasm by build.sh). It wires the wasm module's
 host imports to real OS facilities (raw-terminal stdio, save-game files, a
 monotonic clock) and renders the framebuffer straight into the terminal as
 24-bit-color half-blocks: no window, no GPU, just ANSI escapes.
@@ -108,7 +108,7 @@ class Terminal:
 
 # --- Host imports --------------------------------------------------------
 #
-# The ten imports all need to reach the module's memory or record state for the host loop, but they have to exist before Doom(...) returns the instance that owns that memory, so they share this one object and the instance fills its `mem` in afterwards.
+# The ten non-audio imports all need to reach the module's memory or record state for the host loop, but they have to exist before Doom(...) returns the instance that owns that memory, so they share this one object and the instance fills its `mem` in afterwards.
 # `mem` holds the DoomRt.Memory rather than its `data` pointer: memory.grow reallocates the buffer, so a cached pointer would go stale mid-tick.
 
 
@@ -268,9 +268,51 @@ class Sink(DoomRt.Fn):
         return List[DoomRt.Val]()
 
 
+class Silence(DoomRt.Fn):
+    """audio.*: this frontend renders but does not play, and a wasm import
+    cannot be left out, so silence is spelled rather than omitted. The ten audio
+    imports that return nothing get this one; the three that return a value get
+    SilentZero. It is what Doom did on a machine with no sound device."""
+
+    def __init__(self):
+        pass
+
+    def invoke(self, a: List[DoomRt.Val]) -> List[DoomRt.Val]:
+        return List[DoomRt.Val]()
+
+
+class SilentZero(DoomRt.Fn):
+    """audio.soundIsPlaying / registerSong / songIsPlaying: 0 reads as "nothing
+    playing" and "no song handle"."""
+
+    def __init__(self):
+        pass
+
+    def invoke(self, a: List[DoomRt.Val]) -> List[DoomRt.Val]:
+        return [DoomRt.Val.of_i32(UInt[32](0))]
+
+
 def instantiate() -> Tuple[Doom, Host]:
     host = Host()
     imports = Dict[str, Dict[str, DoomRt.Extern]]()
+
+    # Two classes cover all thirteen, unlike Go's thirteen functions: here an
+    # import's signature is the string beside it, which is what resolution checks.
+    audio = Dict[str, DoomRt.Extern]()
+    audio["registerSound"] = DoomRt.Extern.of_fn(Silence(), "i32,i32,i32->")
+    audio["startSound"] = DoomRt.Extern.of_fn(Silence(), "i32,i32,i32,i32->")
+    audio["stopSound"] = DoomRt.Extern.of_fn(Silence(), "i32->")
+    audio["updateSoundParams"] = DoomRt.Extern.of_fn(Silence(), "i32,i32,i32->")
+    audio["soundIsPlaying"] = DoomRt.Extern.of_fn(SilentZero(), "i32->i32")
+    audio["registerSong"] = DoomRt.Extern.of_fn(SilentZero(), "i32,i32->i32")
+    audio["unregisterSong"] = DoomRt.Extern.of_fn(Silence(), "i32->")
+    audio["playSong"] = DoomRt.Extern.of_fn(Silence(), "i32,i32->")
+    audio["stopSong"] = DoomRt.Extern.of_fn(Silence(), "->")
+    audio["pauseSong"] = DoomRt.Extern.of_fn(Silence(), "->")
+    audio["resumeSong"] = DoomRt.Extern.of_fn(Silence(), "->")
+    audio["setMusicVolume"] = DoomRt.Extern.of_fn(Silence(), "i32->")
+    audio["songIsPlaying"] = DoomRt.Extern.of_fn(SilentZero(), "->i32")
+    imports["audio"] = audio
 
     console = Dict[str, DoomRt.Extern]()
     console["onErrorMessage"] = DoomRt.Extern.of_fn(Message(host), "i32,i32->")

@@ -2,7 +2,7 @@
 
 An interactive frontend for the DOOM shareware episode that renders straight into the terminal: no window, no GPU.
 `build.sh` fetches jacobenget/doom.wasm (checksum-pinned into the shared apps cache), converts it to Codon with dewasm (`doom_gen.codon`, ~10MB, gitignored, regenerated on every build), and compiles that together with the host program in `main.codon` into one native binary.
-`main.codon` implements the module's ten host imports (console messages, save-game files, the game clock, and frame delivery), draws the framebuffer as 24-bit-color half-blocks, and reads keys from the terminal in raw mode.
+`main.codon` implements the module's host imports (console messages, save-game files, the game clock, frame delivery, and thirteen audio imports it answers silently), draws the framebuffer as 24-bit-color half-blocks, and reads keys from the terminal in raw mode.
 
 This is the [Python frontend](../python/) compiled ahead of time instead of interpreted.
 [Codon](https://github.com/exaloop/codon) is a statically typed Python dialect, not CPython, and its standard library has no `termios`, `select`, `tty` or `os.get_terminal_size`.

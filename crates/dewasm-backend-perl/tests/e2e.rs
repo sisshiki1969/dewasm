@@ -498,6 +498,9 @@ $inst->invoke('zeroperl_flush');
 const PERL_DOOM_FRAME_GLUE: &str = r#"my $frame = { off => undef, w => 0, h => 0 };
 my $ms = 0;
 my $doom = Doom->new({
+    'audio' => { map { $_ => sub { 0 } } qw(registerSound startSound stopSound
+        updateSoundParams soundIsPlaying registerSong unregisterSong playSong
+        stopSong pauseSong resumeSong setMusicVolume songIsPlaying) },
     'console' => { 'onErrorMessage' => sub { }, 'onInfoMessage' => sub { } },
     'gameSaving' => {
         'sizeOfSaveGame' => sub { 0 },

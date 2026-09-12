@@ -96,6 +96,13 @@ imp_draw_frame() {
   return 0
 }
 
+# This frontend renders but does not play, and a wasm import cannot be left
+# out, so silence is spelled rather than omitted. One answer serves all
+# thirteen: 0 is "no song handle" and "nothing playing" for the three that
+# return a value, and ignored for the ten that do not. It is what Doom did on
+# a machine with no sound device.
+imp_audio_silent() { R0=0; return 0; }
+
 # Leaving both output slots untouched selects the wasm-embedded shareware
 # WAD; external WADs are out of scope for this frontend (see ../ruby).
 imp_wad_sizes() { R0=; return 0; }
@@ -111,6 +118,19 @@ imp_on_game_init() {
 # Read by doom_rt_resolve_import in the sourced doom_gen.sh (IMPORTS[mod.name]), not anywhere in this script, hence the unused-variable suppression.
 # shellcheck disable=SC2034
 declare -A IMPORTS=(
+  ['audio.registerSound']=imp_audio_silent
+  ['audio.startSound']=imp_audio_silent
+  ['audio.stopSound']=imp_audio_silent
+  ['audio.updateSoundParams']=imp_audio_silent
+  ['audio.soundIsPlaying']=imp_audio_silent
+  ['audio.registerSong']=imp_audio_silent
+  ['audio.unregisterSong']=imp_audio_silent
+  ['audio.playSong']=imp_audio_silent
+  ['audio.stopSong']=imp_audio_silent
+  ['audio.pauseSong']=imp_audio_silent
+  ['audio.resumeSong']=imp_audio_silent
+  ['audio.setMusicVolume']=imp_audio_silent
+  ['audio.songIsPlaying']=imp_audio_silent
   ['console.onErrorMessage']=imp_on_error
   ['console.onInfoMessage']=imp_on_info
   ['gameSaving.sizeOfSaveGame']=imp_size_of_save

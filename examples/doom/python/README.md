@@ -1,7 +1,7 @@
 # DOOM (Python, ANSI terminal)
 
 An interactive frontend for the DOOM shareware episode that renders straight into the terminal: no window, no GPU.
-`build.sh` fetches jacobenget/doom.wasm (checksum-pinned into the shared apps cache) and converts it to Python with dewasm (`doom_gen.py`, ~11MB, gitignored, regenerated on every build) and links it against a small host program in `main.py` that implements the module's ten host imports (console messages, save-game files, the game clock, and frame delivery), draws the framebuffer as 24-bit-color half-blocks, and reads keys from the terminal in raw mode.
+`build.sh` fetches jacobenget/doom.wasm (checksum-pinned into the shared apps cache) and converts it to Python with dewasm (`doom_gen.py`, ~11MB, gitignored, regenerated on every build) and links it against a small host program in `main.py` that implements the module's host imports (console messages, save-game files, the game clock, frame delivery, and thirteen audio imports it answers silently), draws the framebuffer as 24-bit-color half-blocks, and reads keys from the terminal in raw mode.
 Stdlib only: no third-party packages, nothing to `pip install`.
 
 ## Run
@@ -21,7 +21,7 @@ PyPy's JIT clears that tic rate, which is why `run.sh` prefers it: a playable ga
 CPython has no JIT and interprets the generated source line by line, and DOOM's software renderer and game logic are thousands of lines of hot loops per tic, so there movement reads as a slideshow, not motion.
 The self-check is only 15 ticks, short enough that PyPy's warm-up (about a second) sometimes falls inside it and the reported rate drops to ~10.
 
-It's still worth running under either: the same unmodified wasm binary and the same dewasm-generated library that plays smoothly elsewhere comes out the other side of a stdlib Python interpreter rendering actual DOOM frames, as colored terminal text.
+It's still worth running under either: the same wasm binary and the same dewasm-generated library that plays smoothly elsewhere comes out the other side of a stdlib Python interpreter rendering actual DOOM frames, as colored terminal text.
 That id Software's 1993 engine executes at all through this path, entirely in printable ANSI escape codes, is the point; frame rate isn't.
 
 ## Rendering
