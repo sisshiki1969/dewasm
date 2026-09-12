@@ -1,35 +1,39 @@
 # DOOM (Ruby, gosu window)
 
 An interactive DOOM frontend that renders into a window with [gosu](https://www.libgosu.org/), the SDL2-backed 2D game library for Ruby.
-The sibling [`../ruby`](../ruby) frontend draws the same game into a terminal; this one takes a real window.
+The parent [`../`](../) frontend draws the same game into a terminal; this one takes a real window.
 
-`build.sh` fetches jacobenget/doom.wasm (checksum-pinned into the shared apps cache) and converts it to Ruby with dewasm (`doom_gen.rb`, ~10MB, gitignored, regenerated on every build).
+Both frontends share one generated library: `../build.sh` fetches jacobenget/doom.wasm (checksum-pinned into the shared apps cache) and converts it to Ruby with dewasm (`../doom_gen.rb`, ~11MB, gitignored, regenerated on every build).
 `main.rb` implements the module's host imports (console logging, save-game I/O, the game clock, and frame delivery) plus the gosu window, its renderer and its keyboard input.
-`audio.rb` implements the thirteen audio imports: it wraps each DMX sound lump the module hands over in a WAV container for `Gosu::Sample`, and writes the MIDI the module converts from Doom's MUS encoding to a file for `Gosu::Song`.
-`midi_song.rb` plays that file through SDL2_mixer instead where gosu will not take it, which is described under [Sound](#sound).
+`audio.rb` implements the thirteen audio imports on gosu, and `midi_song.rb` plays the music gosu cannot decode, both described under [Sound](#sound).
 
 ## Requirements
 
-The gosu gem, which builds a native extension against SDL2:
+gosu, and the ffi that `midi_song.rb` needs, are installed by `run.sh` with bundler, into the gitignored `vendor/bundle` of this directory, at the version pinned by `Gemfile.lock`.
+Nothing is installed globally, and the parent terminal frontend stays stdlib-only.
 
-```sh
-gem install gosu          # Debian/Ubuntu: sudo apt install libsdl2-dev
-```
+The gem builds a native extension against SDL2, so its development headers have to be present:
 
-`build.sh` checks for it and prints the per-platform header package if it is missing.
+| Platform | Install |
+| --- | --- |
+| Debian/Ubuntu | `sudo apt install libsdl2-dev` |
+| Fedora | `sudo dnf install SDL2-devel` |
+| macOS | `brew install sdl2` |
 
-Sound effects need nothing further.
-Music needs a MIDI synthesiser, for the reason [below](#sound):
+On macOS, Homebrew's `sdl2` currently resolves to sdl2-compat, whose `sdl2-config` does not support the `--static-libs` flag gosu's build uses; the extension then builds without its SDL2 and AppKit link line and fails at require time with a missing-symbol error.
+Until gosu handles sdl2-compat, install against a real SDL2 (`brew install sdl2 --formula` with a pre-compat bottle, or MacPorts), or wrap `sdl2-config` so `--static-libs` answers with the `--libs` output.
 
-```sh
-gem install ffi
-brew install sdl2_mixer                    # Debian/Ubuntu: sudo apt install libsdl2-mixer-2.0-0 fluid-soundfont-gm
-export SDL_SOUNDFONTS=/path/to/some.sf2    # any General MIDI soundfont, macOS only
-```
+Sound effects need nothing beyond that.
+Music needs SDL2_mixer and a soundfont, for the reason under [Sound](#sound):
+
+| Platform | Install | Soundfont |
+| --- | --- | --- |
+| Debian/Ubuntu | `sudo apt install libsdl2-mixer-2.0-0 fluid-soundfont-gm` | found at `/usr/share/sounds/sf2/default-GM.sf2` |
+| macOS | `brew install sdl2_mixer` | `export SDL_SOUNDFONTS=/path/to/some.sf2` |
 
 SDL2_mixer synthesises MIDI with fluidsynth, which needs a soundfont.
-On Linux it reads `/usr/share/sounds/sf2/default-GM.sf2` without being told, which is what the soundfont package above provides; on macOS there is no such default, so `SDL_SOUNDFONTS` has to name one.
-Without any of this the game runs with its effects and no music, and says so once.
+On Linux it reads `/usr/share/sounds/sf2/default-GM.sf2` without being told; on macOS there is no such default, so `SDL_SOUNDFONTS` has to name one.
+Without either the game runs with its effects and no music, and says so once.
 
 ## Why a window is affordable here
 
@@ -87,7 +91,7 @@ Measured on an x86-64 Linux container under Ruby 3.3.6 **without** YJIT (that bu
 | One `tickGame` | 226ms |
 
 The wasm tick dominates by an order of magnitude, which is the point: rendering is not what makes this frontend slow, and YJIT (which `run.sh` always passes, and which `main.rb` warns about on stderr if it ends up missing) is what moves the tick figure.
-The sibling terminal frontend measures the same Ruby backend at 15.9 ticks/sec with YJIT on an Apple Silicon laptop.
+The terminal frontend measures the same Ruby backend at 15.9 ticks/sec with YJIT on an Apple Silicon laptop.
 
 ## Controls
 
@@ -113,12 +117,12 @@ Save games are written to `.savegame/` (gitignored) relative to wherever the scr
 
 ## Sound
 
-The module hands over each sound as a DMX lump (an 8-byte header and unsigned 8-bit mono samples) and each song as standard MIDI, having converted it from Doom's own MUS encoding.
+The module hands over each sound as a DMX lump (an 8-byte header and unsigned 8-bit mono samples) and each song as standard MIDI, having converted it from DOOM's own MUS encoding.
 `audio.rb` wraps a lump in a 44-byte WAV header, which costs one string concatenation per distinct sound, and writes both to files because gosu loads audio from paths rather than from memory.
 
 Music does not go to `Gosu::Song`, though it is offered there first.
 gosu decodes audio with SDL_sound, whose decoders are WAV, AIFF, VOC, AU, FLAC, MP3, Ogg Vorbis, Shorten and tracker modules: MIDI is not among them, so a released gosu answers `Could not parse audio file ...: Sound format unsupported` for every song, whatever the machine has installed.
 `midi_song.rb` therefore binds the eleven SDL2_mixer entry points that music needs and presents them as `Gosu::Song`'s interface, so the rest of `audio.rb` does not know which one it holds.
-SDL2_mixer is what Doom's own SDL backend plays these same files with, and it synthesises MIDI through fluidsynth or timidity.
+SDL2_mixer is what DOOM's own SDL backend plays these same files with, and it synthesises MIDI through fluidsynth or timidity.
 
 Offering gosu the file first is not a formality: monoruby ships a gosu whose audio *is* SDL2_mixer, and there `Gosu::Song` takes the MIDI and no second output device is opened.

@@ -1,7 +1,7 @@
 # Decision 91: Extend the Guest When the Interface, Not the Frontend, Is What Is Missing
 
 Status: **Accepted, 2026-09-08.**
-`examples/doom` pins upstream doom.wasm v0.1.0 plus [one commit](https://github.com/sisshiki1969/doom.wasm/tree/sound) adding thirteen `audio` imports, and `ruby-gosu/audio.rb` plays them; the other six frontends answer those imports silently.
+`examples/doom` pins upstream doom.wasm v0.1.0 plus [one commit](https://github.com/sisshiki1969/doom.wasm/tree/sound) adding thirteen `audio` imports, and `ruby/gui/audio.rb` plays them; the other six frontends answer those imports silently.
 This revises [decision 50](50-doom-example-shape.md)'s criterion, which forbade rebuilding the guest at all.
 
 ## Context

@@ -1,3 +1,4 @@
-/doom_gen.rb
+/vendor/
+/.bundle/
 /screenshot.png
 /.savegame/

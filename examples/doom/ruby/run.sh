@@ -6,5 +6,4 @@ set -euo pipefail
 cd "$(dirname "$0")"
 
 ./build.sh
-export RUBY_YJIT_ENABLE=1
 exec ruby --yjit main.rb "$@"

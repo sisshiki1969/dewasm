@@ -1,10 +1,11 @@
 # NES on dewasm
 
-One NES, six languages: [agnes](https://github.com/kgabis/agnes) (a dependency-free C NES emulation library, MIT) plus a thin wrapper ([`../apps/src/nes_demo.c`](../apps/src/nes_demo.c)) compiled to a single 19KB wasm module with an **empty import section**, converted by `dewasm --mode library` and played through a native frontend per language:
+One NES, six languages: [agnes](https://github.com/kgabis/agnes) (a dependency-free C NES emulation library, MIT) plus a thin wrapper ([`../apps/src/nes_demo.c`](../apps/src/nes_demo.c)) compiled to a single 19KB wasm module with an **empty import section**, converted by `dewasm --mode library` and played through seven native frontends across six languages:
 
 - [`go/`](go/): Go, rendering with [ebiten](https://github.com/hajimehoshi/ebiten)
 - [`java/`](java/): Java, rendering with Swing (plain JDK, zero dependencies)
 - [`ruby/`](ruby/): Ruby, rendering *into the terminal* as 24-bit-color ANSI half-blocks (stdlib only, run with `--yjit`)
+- [`ruby/gui/`](ruby/gui/): the same generated Ruby library in a window, with [gosu](https://www.libgosu.org/), in the shape of the DOOM demo's [`ruby/gui`](../doom/ruby/gui); real key releases feed `setInput`'s held-button bitmask directly
 - [`python/`](python/): Python, the same terminal renderer (stdlib only, ~11 frames/sec under PyPy, ~2.2 under CPython)
 - [`perl/`](perl/): Perl, the same terminal renderer (core modules only, ~0.9 frames/sec)
 - [`bash/`](bash/): pure Bash, same terminal renderer; ~20-40 seconds per frame, an existence proof in the bash-DOOM tradition
@@ -20,7 +21,7 @@ The compared oracle is `nes_frame.ppm`; this PNG is the same frame for human eye
 ## Run
 
 ```sh
-go/run.sh    # or: java/run.sh, ruby/run.sh, ...
+go/run.sh    # or: java/run.sh, ruby/run.sh, ruby/gui/run.sh, ...
 go/run.sh path/to/other.nes   # any ROM agnes's mappers cover
 ```
 

@@ -1,17 +1,16 @@
 #!/usr/bin/env ruby
 # frozen_string_literal: true
 
-# Interactive windowed frontend for the dewasm-generated DOOM library
-# (doom_gen.rb, produced from jacobenget/doom.wasm by build.sh), rendering with gosu.
+# Interactive windowed frontend for the dewasm-generated DOOM library (../doom_gen.rb, produced from jacobenget/doom.wasm by ../build.sh and shared with the terminal frontend), rendering with gosu.
 #
-# The sibling ../ruby frontend draws into a terminal because the Ruby backend only manages ~15 ticks/sec under YJIT and a terminal has orders of magnitude fewer cells than a window has pixels.
+# The parent ../main.rb draws into a terminal because the Ruby backend only manages ~15 ticks/sec under YJIT and a terminal has orders of magnitude fewer cells than a window has pixels.
 # This one takes the window anyway, which is affordable because the module's 640x400 framebuffer is an exact 2x upscale of DOOM's native 320x200: halving it back is lossless and leaves 64000 pixels per frame to hand to the GPU, not 256000.
 # What the window buys over the terminal is real key releases, so Ctrl (fire) and Shift (run) work as they do in DOOM.
 #
 # Run with --smoke for a headless self-check (no window, no display needed).
 
+require_relative "../doom_gen"
 require_relative "audio"
-require_relative "doom_gen"
 require "gosu"
 
 SAVE_DIR = ".savegame"
@@ -211,12 +210,12 @@ class DoomWindow < Gosu::Window
     @ticks += 1
     @rate_ticks += 1
     return unless (@ticks % CAPTION_UPDATE_EVERY).zero?
-    
+
     now = Process.clock_gettime(Process::CLOCK_MONOTONIC)
     @rate = @rate_ticks / (now - @rate_window_start)
     @rate_ticks = 0
     @rate_window_start = now
-    self.caption = format("DOOM (dewasm) - %.1f tps #{RUBY_DESCRIPTION} ", @rate)
+    self.caption = format("DOOM (dewasm) - %.1f ticks/sec - #{RUBY_DESCRIPTION}", @rate)
   end
 
   def draw
@@ -280,8 +279,7 @@ end
 def start_doom
   frame_state = { width: 0, height: 0, rgba: nil, buf_off: nil, converter: nil }
   doom_holder = [nil]
-  # Reads the sound and music lumps the module hands over, so it takes the
-  # same deferred view of memory the other imports do.
+  # Reads the sound and music lumps the module hands over, so it takes the same deferred view of memory the other imports do.
   audio = DoomAudio.new(DeferredMemory.new(doom_holder))
   doom = Doom.new(build_imports(doom_holder, frame_state, audio))
   doom_holder[0] = doom
