@@ -32,19 +32,9 @@ SAVE_DIR = ".savegame"
 # and discarded for the ten that do not. It is what DOOM did on a machine with
 # no sound device.
 AUDIO_IMPORTS = (
-    "registerSound",
-    "startSound",
-    "stopSound",
-    "updateSoundParams",
-    "soundIsPlaying",
-    "registerSong",
-    "unregisterSong",
-    "playSong",
-    "stopSong",
-    "pauseSong",
-    "resumeSong",
-    "setMusicVolume",
-    "songIsPlaying",
+    "registerSound", "startSound", "stopSound", "updateSoundParams", "soundIsPlaying",
+    "registerSong", "unregisterSong", "playSong", "stopSong", "pauseSong",
+    "resumeSong", "setMusicVolume", "songIsPlaying",
 )
 
 # reportKeyDown/reportKeyUp expect the module's KEY_* global values, looked up once after the module is constructed (they're plain ints, not globals that can change at runtime).
