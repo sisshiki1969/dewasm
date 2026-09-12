@@ -351,10 +351,21 @@ public class Main {
                 }
                 return null;
             };
+            // This frontend renders but does not play, and a wasm import cannot be left out, so silence is spelled rather than omitted.
+            // One answer serves all thirteen: 0 is "no song handle" and "nothing playing" for the three that return a value, and discarded for the ten that do not.
+            // It is what DOOM did on a machine with no sound device.
+            Doom.Rt.Fn audioSilent = a -> 0;
+            String[] audioImports = {"registerSound", "startSound", "stopSound", "updateSoundParams", "soundIsPlaying",
+                    "registerSong", "unregisterSong", "playSong", "stopSong", "pauseSong", "resumeSong",
+                    "setMusicVolume", "songIsPlaying"};
+
             Doom.Rt.Fn wadSizes = a -> null; // leave the pre-zeroed count/size in place: selects the embedded shareware WAD.
             Doom.Rt.Fn readWads = a -> null; // never called when wadSizes leaves the count at 0.
 
             Map<String, Map<String, Object>> imports = new HashMap<>();
+            for (String name : audioImports) {
+                imports.computeIfAbsent("audio", k -> new HashMap<>()).put(name, audioSilent);
+            }
             imports.computeIfAbsent("console", k -> new HashMap<>()).put("onErrorMessage", onErrorMessage);
             imports.computeIfAbsent("console", k -> new HashMap<>()).put("onInfoMessage", onInfoMessage);
             imports.computeIfAbsent("gameSaving", k -> new HashMap<>()).put("sizeOfSaveGame", sizeOfSaveGame);

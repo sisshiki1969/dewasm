@@ -12,6 +12,16 @@ require_relative "doom_gen"
 require "io/console"
 
 SAVE_DIR = ".savegame"
+
+# This frontend renders but does not play, and a wasm import cannot be left out, so silence is spelled rather than omitted.
+# One answer serves all thirteen: 0 is "no song handle" and "nothing playing" for the three that return a value, and discarded for the ten that do not.
+# It is what DOOM did on a machine with no sound device.
+AUDIO_IMPORTS = %w[
+  registerSound startSound stopSound updateSoundParams soundIsPlaying
+  registerSong unregisterSong playSong stopSong pauseSong resumeSong
+  setMusicVolume songIsPlaying
+].freeze
+
 # Terminals deliver only key *presses*, so a press is held "down" for this long after the last matching press/autorepeat before synthesizing the release; comfortably above a terminal's own autorepeat interval.
 KEY_HOLD_SECONDS = 0.18
 
@@ -19,7 +29,7 @@ def save_game_path(id)
   File.join(SAVE_DIR, "doomsav#{id}.dsg")
 end
 
-# Wires the wasm module's ten host imports to Ruby.
+# Wires the wasm module's host imports to Ruby.
 # `doom_holder` exists because these closures have to be built before Doom.new returns the instance they read memory from; it's filled in immediately after construction and only read from within calls the imports themselves receive later (never during Doom.new itself).
 def build_imports(doom_holder, frame_state, suppress_info:)
   {
@@ -35,6 +45,7 @@ def build_imports(doom_holder, frame_state, suppress_info:)
         puts doom_holder[0].memory.buffer.get_string(off, len)
       end,
     },
+    "audio" => AUDIO_IMPORTS.to_h { |name| [name, ->(*) { 0 }] },
     "gameSaving" => {
       "sizeOfSaveGame" => lambda do |id|
         path = save_game_path(id)

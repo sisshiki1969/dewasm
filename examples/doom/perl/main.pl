@@ -18,6 +18,18 @@ use Time::HiRes qw(clock_gettime CLOCK_MONOTONIC);
 require "$FindBin::Bin/doom_gen.pl";
 
 use constant SAVE_DIR => '.savegame';
+
+# This frontend renders but does not play, and a wasm import cannot be left
+# out, so silence is spelled rather than omitted. One answer serves all
+# thirteen: 0 is "no song handle" and "nothing playing" for the three that
+# return a value, and discarded for the ten that do not. It is what Doom did
+# on a machine with no sound device.
+use constant AUDIO_IMPORTS => qw(
+    registerSound startSound stopSound updateSoundParams soundIsPlaying
+    registerSong unregisterSong playSong stopSong pauseSong resumeSong
+    setMusicVolume songIsPlaying
+);
+
 # Terminals deliver only key *presses*, so a press is held "down" for this long after the last matching press/autorepeat before synthesizing the release.
 # Wider than Ruby's 180ms window because this backend only manages
 # ~0.7 ticks/sec, so polls (and therefore chances to notice an autorepeat)
@@ -34,7 +46,7 @@ sub monotonic { return clock_gettime(CLOCK_MONOTONIC); }
 
 sub save_game_path { return SAVE_DIR . "/doomsav$_[0].dsg"; }
 
-# Wires the wasm module's ten host imports to Perl.
+# Wires the wasm module's host imports to Perl.
 # `$doom_ref` exists because these closures have to be built before Doom->new returns the instance they read memory from; it's filled in immediately after construction and only dereferenced within calls the imports themselves receive later (never during Doom->new itself).
 sub build_imports {
     my ($doom_ref, $frame, $suppress_info) = @_;
@@ -84,6 +96,7 @@ sub build_imports {
                 $frame->{pixels} = $mem_string->($buf_off, $len);
             },
         },
+        'audio' => { map { $_ => sub { 0 } } AUDIO_IMPORTS },
         'loading' => {
             'onGameInit' => sub { ($frame->{w}, $frame->{h}) = @_; },
             # Leaving both output slots untouched (they arrive pre-zeroed)

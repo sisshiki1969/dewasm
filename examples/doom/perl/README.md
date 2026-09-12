@@ -1,7 +1,7 @@
 # DOOM (Perl, ANSI terminal)
 
 An interactive frontend for the DOOM shareware episode that renders straight into the terminal: no window, no GPU (see `../go` and `../java` for the pixel-window frontends).
-`build.sh` fetches jacobenget/doom.wasm (checksum-pinned into the shared apps cache) and converts it to Perl with dewasm (`doom_gen.pl`, ~12MB, gitignored, regenerated on every build) and `main.pl` implements the module's ten host imports (console messages, save-game files, the game clock, and frame delivery), draws the framebuffer as 24-bit-color half-blocks, and reads keys from the terminal in raw mode.
+`build.sh` fetches jacobenget/doom.wasm (checksum-pinned into the shared apps cache) and converts it to Perl with dewasm (`doom_gen.pl`, ~12MB, gitignored, regenerated on every build) and `main.pl` implements the module's host imports (console messages, save-game files, the game clock, frame delivery, and thirteen audio imports it answers silently), draws the framebuffer as 24-bit-color half-blocks, and reads keys from the terminal in raw mode.
 Core modules only: no CPAN installs.
 Raw mode goes through `stty` because `Term::ReadKey` is not core.
 
@@ -20,7 +20,7 @@ takes over the terminal (alternate screen, hidden cursor, raw input) and starts 
 DOOM's renderer is all integer math, so the usual Perl-backend cost center (float ops as sub calls) barely applies; what's left is that plain Perl has no JIT and every generated function call pays the backend's recursion-depth accounting.
 This is not a playable game: it's a slideshow with a crosshair.
 
-It's still worth running, for the same reason the Python frontend is: the same unmodified wasm binary that plays smoothly through Go and Java runs, unmodified, through a plain Perl interpreter and comes out the other side rendering actual DOOM frames as ANSI escape codes.
+It's still worth running, for the same reason the Python frontend is: the same wasm binary that plays smoothly through Go and Java runs, with nothing changed for Perl, through a plain Perl interpreter and comes out the other side rendering actual DOOM frames as ANSI escape codes.
 The terminal rendering itself costs ~6ms/frame, noise against a ~1.4s tick.
 
 ## Rendering
