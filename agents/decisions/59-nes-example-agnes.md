@@ -46,6 +46,6 @@ The degenerate-frame guard accepts ≥5 distinct colors: NES palettes are small 
 ## Consequences
 
 - Positive: first demo where the converted artifact is a *platform* rather than a program: the frontends are six native NES players.
-  The export-only interface is the simplest possible library-mode embedding, a gentler reference than DOOM's ten imports.
+  The export-only interface is the simplest possible library-mode embedding, a gentler reference than DOOM's imports.
 - Negative: agnes has no APU (silent, like DOOM) and its mapper coverage caps which ROMs run; accuracy is hobby-grade, accepted because the demo claims conversion fidelity (byte-identical frames across backends), not emulation fidelity.
 - Carry-over: `setInput` is untested by the snapshot (input-free by design); the frontends are its only exercise.

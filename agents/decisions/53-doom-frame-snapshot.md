@@ -29,7 +29,7 @@ Add a **deterministic framebuffer snapshot** test, structured like the C-API cas
 Three specifics:
 
 - **Driving contract (identical in the oracle and every backend).**
-  Provide the ten imports; `timeInMilliseconds` is a counter that self-advances a *large* fixed step (1000 ms) on every read.
+  Provide the imports; `timeInMilliseconds` is a counter that self-advances a *large* fixed step (1000 ms) on every read.
   Self-advancing (not frozen between host steps) is what stops it hanging (DOOM's startup and inter-tic waits spin on the clock, so it must keep moving), and the read count, hence the exact clock sequence, is a pure function of the wasm, identical across the oracle and every backend.
   The step is *large* so DOOM's spiral-of-death protection caps the tics it simulates (a big jump makes it skip ahead, exactly as the real wall clock does when it leaps between a slow backend's calls); a 1 ms step would creep to seconds of simulated time and make DOOM run ~80 tics, byte-identical but tens of times more work, turning the Bash run into ~an hour.
   `wadSizes`/`readWads` are no-ops (the module falls back to its embedded shareware WAD when the out-params stay zero, `examples/doom/go/doom/host.go:124-133`), `gameSaving.*` are `0/0/len` no-ops (no filesystem, as bash already proves at `examples/doom/bash/main.sh:89-96`).

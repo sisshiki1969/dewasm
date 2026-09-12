@@ -1,16 +1,17 @@
 # DOOM on dewasm
 
-One DOOM, six languages: the unmodified [jacobenget/doom.wasm](https://github.com/jacobenget/doom.wasm) v0.1.0 binary (DOOM compiled to a single wasm module with a ten-function host interface and the shareware WAD embedded), converted by `dewasm --mode library` and played through seven native frontends across six languages:
+One DOOM, six languages: the [jacobenget/doom.wasm](https://github.com/jacobenget/doom.wasm) v0.1.0 binary (DOOM compiled to a single wasm module with a hand-written host interface and the shareware WAD embedded), plus the audio interface that release does not have, converted by `dewasm --mode library` and played through seven native frontends across six languages:
 
 - [`go/`](go/): Go, rendering with [ebiten](https://github.com/hajimehoshi/ebiten)
 - [`java/`](java/): Java, rendering with Swing (plain JDK, zero dependencies)
 - [`ruby/`](ruby/): Ruby, rendering *into the terminal* as 24-bit-color ANSI half-blocks (stdlib only, run with `--yjit`)
-- [`ruby/gui/`](ruby/gui/): the same generated Ruby library in a window, with [gosu](https://www.libgosu.org/); the 640x400 framebuffer is an exact 2x upscale of DOOM's native 320x200, so the texture it uploads is a quarter of the pixels and the render cost does not grow with the window
+- [`ruby/gui/`](ruby/gui/): the same generated Ruby library in a window, with [gosu](https://www.libgosu.org/), and the only frontend with sound; the 640x400 framebuffer is an exact 2x upscale of DOOM's native 320x200, so the texture it uploads is a quarter of the pixels and the render cost does not grow with the window
 - [`python/`](python/): Python, the same terminal renderer (stdlib only; ~45 ticks/sec under PyPy, ~1.2-1.8 under CPython)
 - [`perl/`](perl/): Perl, the same terminal renderer (core modules only; ~0.7 ticks/sec, no JIT and per-call depth accounting)
 - [`bash/`](bash/): pure Bash, same terminal renderer; ~2 minutes to boot and ~34 seconds per frame, an existence proof and likely a first (also available as a [single-file `doom.bash` Gist](https://gist.github.com/makenowjust/b1e9c2a585183f41a5f8f61b4bc9924c), separate from this MIT repo because the built artifact embeds the GPL-2.0 engine)
 
-Each frontend implements the same ten imports (framebuffer hand-off, monotonic clock, WAD loading, save games, console logging) in its own language and drives the exported `initGame`/`tickGame`/`reportKeyDown`/`reportKeyUp`.
+Each frontend implements the same twenty-three imports (framebuffer hand-off, monotonic clock, WAD loading, save games, console logging, sound and music) in its own language and drives the exported `initGame`/`tickGame`/`reportKeyDown`/`reportKeyUp`.
+A wasm import cannot be left out, so the six frontends that do not play answer the thirteen audio imports with the least the module accepts rather than omitting them.
 The wasm module is the portable artifact; only the host layer differs.
 
 ![The deterministic DOOM frame snapshot](../apps/snapshots/doom_frame.png)
@@ -33,5 +34,7 @@ A window is not actually ruled out at those rates, as `ruby/gui/` shows: what th
 Bash, after the associative-memory and inlined-load/store work, boots in ~2 minutes and draws a frame every ~34 seconds, not playable but genuinely running.
 Terminals report key presses but not releases, so the terminal frontends synthesize key-up events after a short hold window, and fire is on `f` (Ctrl never reaches a terminal app as a plain key).
 
-No sound: the module exposes no audio interface.
+Sound plays in `ruby/gui/` only; the rest render silently.
+The audio interface is not in upstream's v0.1.0 release: the pinned module is that release plus [one commit](https://github.com/sisshiki1969/doom.wasm/tree/sound) adding it, which reverting reproduces the release binary exactly.
+Doom itself is untouched by it: doomgeneric already looks for a sound module behind `FEATURE_SOUND`, and the commit supplies one that forwards to thirteen `audio` imports.
 This example is built by its own scripts and is not part of `cargo test`.

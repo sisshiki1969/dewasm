@@ -3,3 +3,6 @@
 source "https://rubygems.org"
 
 gem "gosu", "~> 1.4"
+
+# Music only: gosu cannot decode MIDI, so midi_song.rb plays it through SDL2_mixer.
+gem "ffi", "~> 1.17"
