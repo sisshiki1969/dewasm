@@ -12,6 +12,16 @@ require_relative "doom_gen"
 require "io/console"
 
 SAVE_DIR = ".savegame"
+
+# This frontend renders but does not play, and a wasm import cannot be left out, so silence is spelled rather than omitted.
+# One answer serves all thirteen: 0 is "no song handle" and "nothing playing" for the three that return a value, and discarded for the ten that do not.
+# It is what DOOM did on a machine with no sound device.
+AUDIO_IMPORTS = %w[
+  registerSound startSound stopSound updateSoundParams soundIsPlaying
+  registerSong unregisterSong playSong stopSong pauseSong resumeSong
+  setMusicVolume songIsPlaying
+].freeze
+
 # Terminals deliver only key *presses*, so a press is held "down" for this long after the last matching press/autorepeat before synthesizing the release; comfortably above a terminal's own autorepeat interval.
 KEY_HOLD_SECONDS = 0.18
 
@@ -35,24 +45,7 @@ def build_imports(doom_holder, frame_state, suppress_info:)
         puts doom_holder[0].memory.buffer.get_string(off, len)
       end,
     },
-    # This frontend renders but does not play: every audio import is answered with the least the module will accept.
-    # A wasm import cannot be left out, so silence has to be spelled rather than omitted.
-    # Declining every sound and reporting nothing playing is a state DOOM already handles: it is what a machine with no sound device looked like.
-    "audio" => {
-      "registerSound" => lambda { |_sfx_id, _data, _length| },
-      "startSound" => lambda { |_sfx_id, _channel, _volume, _separation| },
-      "stopSound" => lambda { |_channel| },
-      "updateSoundParams" => lambda { |_channel, _volume, _separation| },
-      "soundIsPlaying" => lambda { |_channel| 0 },
-      "registerSong" => lambda { |_data, _length| 0 },
-      "unregisterSong" => lambda { |_handle| },
-      "playSong" => lambda { |_handle, _looping| },
-      "stopSong" => lambda { 0 },
-      "pauseSong" => lambda { 0 },
-      "resumeSong" => lambda { 0 },
-      "setMusicVolume" => lambda { |_volume| },
-      "songIsPlaying" => lambda { 0 },
-    },
+    "audio" => AUDIO_IMPORTS.to_h { |name| [name, ->(*) { 0 }] },
     "gameSaving" => {
       "sizeOfSaveGame" => lambda do |id|
         path = save_game_path(id)

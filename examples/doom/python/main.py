@@ -26,6 +26,27 @@ import doom_gen
 
 SAVE_DIR = ".savegame"
 
+# This frontend renders but does not play, and a wasm import cannot be left out,
+# so silence is spelled rather than omitted. One answer serves all thirteen: 0
+# is "no song handle" and "nothing playing" for the three that return a value,
+# and discarded for the ten that do not. It is what DOOM did on a machine with
+# no sound device.
+AUDIO_IMPORTS = (
+    "registerSound",
+    "startSound",
+    "stopSound",
+    "updateSoundParams",
+    "soundIsPlaying",
+    "registerSong",
+    "unregisterSong",
+    "playSong",
+    "stopSong",
+    "pauseSong",
+    "resumeSong",
+    "setMusicVolume",
+    "songIsPlaying",
+)
+
 # reportKeyDown/reportKeyUp expect the module's KEY_* global values, looked up once after the module is constructed (they're plain ints, not globals that can change at runtime).
 KEY_NAMES = (
     "KEY_UPARROW",
@@ -128,26 +149,7 @@ IMPORTS = {
         "onErrorMessage": on_error_message,
         "onInfoMessage": on_info_message,
     },
-    # This frontend renders but does not play: every audio import is answered
-    # with the least the module will accept. A wasm import cannot be left out,
-    # so silence has to be spelled rather than omitted. Declining every sound
-    # and reporting nothing playing is a state Doom already handles -- it is
-    # what a machine with no sound device looked like.
-    "audio": {
-        "registerSound": lambda sfx_id, data, length: None,
-        "startSound": lambda sfx_id, channel, volume, separation: None,
-        "stopSound": lambda channel: None,
-        "updateSoundParams": lambda channel, volume, separation: None,
-        "soundIsPlaying": lambda channel: 0,
-        "registerSong": lambda data, length: 0,
-        "unregisterSong": lambda handle: None,
-        "playSong": lambda handle, looping: None,
-        "stopSong": lambda: None,
-        "pauseSong": lambda: None,
-        "resumeSong": lambda: None,
-        "setMusicVolume": lambda volume: None,
-        "songIsPlaying": lambda: 0,
-    },
+    "audio": dict.fromkeys(AUDIO_IMPORTS, lambda *_: 0),
     "gameSaving": {
         "sizeOfSaveGame": size_of_save_game,
         "readSaveGame": read_save_game,

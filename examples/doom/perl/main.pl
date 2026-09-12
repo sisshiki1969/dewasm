@@ -18,6 +18,18 @@ use Time::HiRes qw(clock_gettime CLOCK_MONOTONIC);
 require "$FindBin::Bin/doom_gen.pl";
 
 use constant SAVE_DIR => '.savegame';
+
+# This frontend renders but does not play, and a wasm import cannot be left
+# out, so silence is spelled rather than omitted. One answer serves all
+# thirteen: 0 is "no song handle" and "nothing playing" for the three that
+# return a value, and discarded for the ten that do not. It is what Doom did
+# on a machine with no sound device.
+use constant AUDIO_IMPORTS => qw(
+    registerSound startSound stopSound updateSoundParams soundIsPlaying
+    registerSong unregisterSong playSong stopSong pauseSong resumeSong
+    setMusicVolume songIsPlaying
+);
+
 # Terminals deliver only key *presses*, so a press is held "down" for this long after the last matching press/autorepeat before synthesizing the release.
 # Wider than Ruby's 180ms window because this backend only manages
 # ~0.7 ticks/sec, so polls (and therefore chances to notice an autorepeat)
@@ -84,27 +96,7 @@ sub build_imports {
                 $frame->{pixels} = $mem_string->($buf_off, $len);
             },
         },
-        # This frontend renders but does not play: every audio import is
-        # answered with the least the module will accept. A wasm import
-        # cannot be left out, so silence has to be spelled rather than
-        # omitted. Declining every sound and reporting nothing playing is a
-        # state Doom already handles -- it is what a machine with no sound
-        # device looked like.
-        'audio' => {
-            'registerSound' => sub { },
-            'startSound' => sub { },
-            'stopSound' => sub { },
-            'updateSoundParams' => sub { },
-            'soundIsPlaying' => sub { 0 },
-            'registerSong' => sub { 0 },
-            'unregisterSong' => sub { },
-            'playSong' => sub { },
-            'stopSong' => sub { },
-            'pauseSong' => sub { },
-            'resumeSong' => sub { },
-            'setMusicVolume' => sub { },
-            'songIsPlaying' => sub { 0 },
-        },
+        'audio' => { map { $_ => sub { 0 } } AUDIO_IMPORTS },
         'loading' => {
             'onGameInit' => sub { ($frame->{w}, $frame->{h}) = @_; },
             # Leaving both output slots untouched (they arrive pre-zeroed)

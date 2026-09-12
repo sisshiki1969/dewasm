@@ -641,18 +641,18 @@ imp_draw_frame() { FRAME_BUF_OFF=$1; R0=; return 0; }
 imp_on_game_init() { FRAME_W=$1; FRAME_H=$2; R0=; return 0; }
 
 declare -A IMPORTS=(
-  ['audio.registerSound']=imp_noop
-  ['audio.startSound']=imp_noop
-  ['audio.stopSound']=imp_noop
-  ['audio.updateSoundParams']=imp_noop
+  ['audio.registerSound']=imp_zero
+  ['audio.startSound']=imp_zero
+  ['audio.stopSound']=imp_zero
+  ['audio.updateSoundParams']=imp_zero
   ['audio.soundIsPlaying']=imp_zero
   ['audio.registerSong']=imp_zero
-  ['audio.unregisterSong']=imp_noop
-  ['audio.playSong']=imp_noop
-  ['audio.stopSong']=imp_noop
-  ['audio.pauseSong']=imp_noop
-  ['audio.resumeSong']=imp_noop
-  ['audio.setMusicVolume']=imp_noop
+  ['audio.unregisterSong']=imp_zero
+  ['audio.playSong']=imp_zero
+  ['audio.stopSong']=imp_zero
+  ['audio.pauseSong']=imp_zero
+  ['audio.resumeSong']=imp_zero
+  ['audio.setMusicVolume']=imp_zero
   ['audio.songIsPlaying']=imp_zero
   ['console.onErrorMessage']=imp_noop
   ['console.onInfoMessage']=imp_noop

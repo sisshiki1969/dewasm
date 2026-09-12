@@ -802,12 +802,10 @@ const JAVA_DOOM_FRAME_GLUE: &str = r#"public class Main {
         gameSaving.put("writeSaveGame", (Doom.Rt.Fn)(args -> args[2]));
         imports.put("gameSaving", gameSaving);
         java.util.Map<String, Object> audio = new java.util.HashMap<>();
-        for (String silent : new String[] {"registerSound", "startSound", "stopSound", "updateSoundParams",
-                "unregisterSong", "playSong", "stopSong", "pauseSong", "resumeSong", "setMusicVolume"}) {
-            audio.put(silent, (Doom.Rt.Fn)(args -> null));
-        }
-        for (String notPlaying : new String[] {"soundIsPlaying", "registerSong", "songIsPlaying"}) {
-            audio.put(notPlaying, (Doom.Rt.Fn)(args -> 0));
+        for (String name : new String[] {"registerSound", "startSound", "stopSound", "updateSoundParams",
+                "soundIsPlaying", "registerSong", "unregisterSong", "playSong", "stopSong", "pauseSong",
+                "resumeSong", "setMusicVolume", "songIsPlaying"}) {
+            audio.put(name, (Doom.Rt.Fn)(args -> 0));
         }
         imports.put("audio", audio);
         java.util.Map<String, Object> runtimeControl = new java.util.HashMap<>();

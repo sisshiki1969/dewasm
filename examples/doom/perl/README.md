@@ -20,7 +20,7 @@ takes over the terminal (alternate screen, hidden cursor, raw input) and starts 
 DOOM's renderer is all integer math, so the usual Perl-backend cost center (float ops as sub calls) barely applies; what's left is that plain Perl has no JIT and every generated function call pays the backend's recursion-depth accounting.
 This is not a playable game: it's a slideshow with a crosshair.
 
-It's still worth running, for the same reason the Python frontend is: the same unmodified wasm binary that plays smoothly through Go and Java runs, unmodified, through a plain Perl interpreter and comes out the other side rendering actual DOOM frames as ANSI escape codes.
+It's still worth running, for the same reason the Python frontend is: the same wasm binary that plays smoothly through Go and Java runs, with nothing changed for Perl, through a plain Perl interpreter and comes out the other side rendering actual DOOM frames as ANSI escape codes.
 The terminal rendering itself costs ~6ms/frame, noise against a ~1.4s tick.
 
 ## Rendering

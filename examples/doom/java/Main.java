@@ -351,22 +351,20 @@ public class Main {
                 }
                 return null;
             };
-            // This frontend renders but does not play: every audio import is answered with the least the module will accept.
-            // A wasm import cannot be left out, so silence has to be spelled rather than omitted.
-            // Declining every sound and reporting nothing playing is a state DOOM already handles: it is what a machine with no sound device looked like.
-            Doom.Rt.Fn audioSilent = a -> null;
-            Doom.Rt.Fn audioNotPlaying = a -> 0;
+            // This frontend renders but does not play, and a wasm import cannot be left out, so silence is spelled rather than omitted.
+            // One answer serves all thirteen: 0 is "no song handle" and "nothing playing" for the three that return a value, and discarded for the ten that do not.
+            // It is what DOOM did on a machine with no sound device.
+            Doom.Rt.Fn audioSilent = a -> 0;
+            String[] audioImports = {"registerSound", "startSound", "stopSound", "updateSoundParams", "soundIsPlaying",
+                    "registerSong", "unregisterSong", "playSong", "stopSong", "pauseSong", "resumeSong",
+                    "setMusicVolume", "songIsPlaying"};
 
             Doom.Rt.Fn wadSizes = a -> null; // leave the pre-zeroed count/size in place: selects the embedded shareware WAD.
             Doom.Rt.Fn readWads = a -> null; // never called when wadSizes leaves the count at 0.
 
             Map<String, Map<String, Object>> imports = new HashMap<>();
-            for (String silent : new String[] {"registerSound", "startSound", "stopSound", "updateSoundParams",
-                    "unregisterSong", "playSong", "stopSong", "pauseSong", "resumeSong", "setMusicVolume"}) {
-                imports.computeIfAbsent("audio", k -> new HashMap<>()).put(silent, audioSilent);
-            }
-            for (String notPlaying : new String[] {"soundIsPlaying", "registerSong", "songIsPlaying"}) {
-                imports.computeIfAbsent("audio", k -> new HashMap<>()).put(notPlaying, audioNotPlaying);
+            for (String name : audioImports) {
+                imports.computeIfAbsent("audio", k -> new HashMap<>()).put(name, audioSilent);
             }
             imports.computeIfAbsent("console", k -> new HashMap<>()).put("onErrorMessage", onErrorMessage);
             imports.computeIfAbsent("console", k -> new HashMap<>()).put("onInfoMessage", onInfoMessage);

@@ -553,14 +553,12 @@ def _clock():
     return _ms["v"]
 
 IMPORTS = {
-    "audio": {
-        "registerSound": lambda i, d, n: None, "startSound": lambda i, c, v, s: None,
-        "stopSound": lambda c: None, "updateSoundParams": lambda c, v, s: None,
-        "soundIsPlaying": lambda c: 0, "registerSong": lambda d, n: 0,
-        "unregisterSong": lambda h: None, "playSong": lambda h, l: None,
-        "stopSong": lambda: None, "pauseSong": lambda: None, "resumeSong": lambda: None,
-        "setMusicVolume": lambda v: None, "songIsPlaying": lambda: 0,
-    },
+    "audio": dict.fromkeys(
+        ("registerSound", "startSound", "stopSound", "updateSoundParams", "soundIsPlaying",
+         "registerSong", "unregisterSong", "playSong", "stopSong", "pauseSong", "resumeSong",
+         "setMusicVolume", "songIsPlaying"),
+        lambda *_: 0,
+    ),
     "console": {"onErrorMessage": lambda o, n: None, "onInfoMessage": lambda o, n: None},
     "gameSaving": {
         "sizeOfSaveGame": lambda i: 0,

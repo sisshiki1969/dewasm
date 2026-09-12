@@ -33,41 +33,30 @@ fn capture_frame(bytes: &[u8]) -> wasmtime::Result<(Vec<u8>, u32, u32)> {
 
     // The host imports under the deterministic contract: no console output, no save state, a synthetic clock, the embedded WAD (wad imports are no-ops, leaving their out-params zero), and dims/offset recorded.
     let mut linker = Linker::new(&engine);
-    // Audio changes no pixel, so the oracle declines every sound and reports
-    // nothing playing, exactly as the frontends that do not play do. A wasm
-    // import cannot be left out, which is the only reason these appear here.
-    for name in [
-        "registerSound",
-        "startSound",
-        "stopSound",
-        "updateSoundParams",
-        "unregisterSong",
-        "playSong",
-    ] {
-        match name {
-            "registerSound" | "updateSoundParams" => linker.func_wrap(
-                "audio",
-                name,
-                |_: Caller<'_, DoomState>, _: i32, _: i32, _: i32| {},
-            )?,
-            "startSound" => linker.func_wrap(
-                "audio",
-                name,
-                |_: Caller<'_, DoomState>, _: i32, _: i32, _: i32, _: i32| {},
-            )?,
-            "playSong" => {
-                linker.func_wrap("audio", name, |_: Caller<'_, DoomState>, _: i32, _: i32| {})?
-            }
-            _ => linker.func_wrap("audio", name, |_: Caller<'_, DoomState>, _: i32| {})?,
-        };
+    // Audio changes no pixel, so the oracle declines every sound and reports nothing playing, exactly as the frontends that do not play do.
+    // A wasm import cannot be left out, which is the only reason these appear here; they are grouped by signature, which is all that separates them.
+    for name in ["stopSound", "unregisterSong", "setMusicVolume"] {
+        linker.func_wrap("audio", name, |_: Caller<'_, DoomState>, _: i32| {})?;
     }
     for name in ["stopSong", "pauseSong", "resumeSong"] {
         linker.func_wrap("audio", name, |_: Caller<'_, DoomState>| {})?;
     }
+    for name in ["registerSound", "updateSoundParams"] {
+        linker.func_wrap(
+            "audio",
+            name,
+            |_: Caller<'_, DoomState>, _: i32, _: i32, _: i32| {},
+        )?;
+    }
     linker.func_wrap(
         "audio",
-        "setMusicVolume",
-        |_: Caller<'_, DoomState>, _: i32| {},
+        "startSound",
+        |_: Caller<'_, DoomState>, _: i32, _: i32, _: i32, _: i32| {},
+    )?;
+    linker.func_wrap(
+        "audio",
+        "playSong",
+        |_: Caller<'_, DoomState>, _: i32, _: i32| {},
     )?;
     linker.func_wrap(
         "audio",

@@ -118,43 +118,27 @@ func hostOnGameInit(width, height uint32) {
 	frameBuf = make([]byte, frameW*frameH*4)
 }
 
-// This frontend renders but does not play: every audio import is answered
-// with the least the module will accept. A wasm import cannot be left out,
-// so silence has to be spelled rather than omitted.
-//
-// Declining every sound (`registerSound` stores nothing, `startSound` plays
-// nothing) and reporting nothing playing is a state Doom already handles: it
-// is what a machine with no sound device looked like.
-func hostRegisterSound(sfxID, data, length uint32)             {}
-func hostStartSound(sfxID, channel, volume, separation uint32) {}
-func hostStopSound(channel uint32)                             {}
-func hostUpdateSoundParams(channel, volume, separation uint32) {}
-func hostSoundIsPlaying(channel uint32) uint32                 { return 0 }
-func hostRegisterSong(data, length uint32) uint32              { return 0 }
-func hostUnregisterSong(handle uint32)                         {}
-func hostPlaySong(handle, looping uint32)                      {}
-func hostStopSong()                                            {}
-func hostPauseSong()                                           {}
-func hostResumeSong()                                          {}
-func hostSetMusicVolume(volume uint32)                         {}
-func hostSongIsPlaying() uint32                                { return 0 }
-
 func buildImports() Imports {
 	return Imports{
+		// This frontend renders but does not play, and a wasm import cannot be left out, so silence is spelled rather than omitted.
+		// 0 is "no song handle" and "nothing playing" for the three that return a value; the ten that return nothing say nothing.
+		// It is what Doom did on a machine with no sound device.
+		//
+		// Each import is resolved by a type assertion on its exact signature, so unlike the other frontends these cannot share one function.
 		"audio": map[string]any{
-			"registerSound":     hostRegisterSound,
-			"startSound":        hostStartSound,
-			"stopSound":         hostStopSound,
-			"updateSoundParams": hostUpdateSoundParams,
-			"soundIsPlaying":    hostSoundIsPlaying,
-			"registerSong":      hostRegisterSong,
-			"unregisterSong":    hostUnregisterSong,
-			"playSong":          hostPlaySong,
-			"stopSong":          hostStopSong,
-			"pauseSong":         hostPauseSong,
-			"resumeSong":        hostResumeSong,
-			"setMusicVolume":    hostSetMusicVolume,
-			"songIsPlaying":     hostSongIsPlaying,
+			"registerSound":     func(sfxID, data, length uint32) {},
+			"startSound":        func(sfxID, channel, volume, separation uint32) {},
+			"stopSound":         func(channel uint32) {},
+			"updateSoundParams": func(channel, volume, separation uint32) {},
+			"soundIsPlaying":    func(channel uint32) uint32 { return 0 },
+			"registerSong":      func(data, length uint32) uint32 { return 0 },
+			"unregisterSong":    func(handle uint32) {},
+			"playSong":          func(handle, looping uint32) {},
+			"stopSong":          func() {},
+			"pauseSong":         func() {},
+			"resumeSong":        func() {},
+			"setMusicVolume":    func(volume uint32) {},
+			"songIsPlaying":     func() uint32 { return 0 },
 		},
 		"console": map[string]any{
 			"onErrorMessage": hostOnErrorMessage,
