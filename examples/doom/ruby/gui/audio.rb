@@ -15,6 +15,10 @@ require_relative "midi_song"
 # gosu loads samples and songs from files rather than from memory, so each
 # registration is written to a temporary file first, which is also what Doom's
 # own SDL backend does with music.
+#
+# Songs go to `MidiSong` where gosu will not decode them, which is every gosu
+# but the SDL2_mixer-backed one monoruby ships.
+
 # The module's memory, as seen from an import that runs after construction.
 #
 # Doom hands over sample data by address, so the audio host reads the same
